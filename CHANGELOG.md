@@ -14,6 +14,23 @@ This project follows a simple changelog discipline:
   `set_directory_properties`, `set_source_files_properties`,
   `set_tests_properties`, and `set_package_properties` calls. Custom command
   specs can declare terminal key/value lists with `pairwise: true` (#266).
+- Add a `format.command_line_layout` option for keyword sections holding a
+  single command line, such as `COMMAND` in `add_custom_command`. The default,
+  `standard`, keeps laying them out like any other keyword section, so output
+  doesn't change unless the option is set. With `own-line`, once a call no
+  longer fits on one line, each such keyword goes on a line of its own with the
+  command filled below it, so that every command of a call has the same shape
+  and long commands are no longer put one token per line past
+  `max_hanging_wrap_positional_args`. Other keyword sections, such as `OUTPUT`
+  and `DEPENDS`, keep their layout. The option can also be set in
+  `per_command_overrides` and as `commandLineLayout` in the dprint plugin.
+- Add a `command_line` property for keyword sections in command specs, marking
+  the sections that `command_line_layout` applies to. The built-in specs set it
+  on `COMMAND` in `add_custom_command`, `add_custom_target`, `execute_process`,
+  and `add_test`, and on the `COMMAND`/`*_COMMAND` keywords of
+  `ExternalProject_Add`, `ExternalProject_Add_Step`, and
+  `FetchContent_Declare`. Overrides can set it to `false` to exempt a built-in
+  keyword.
 
 ### Fixed
 

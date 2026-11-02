@@ -187,6 +187,18 @@
           ],
           "default": null
         },
+        "command_line_layout": {
+          "description": "Layout of keyword sections marked `command_line` in the spec: `standard` or `own-line`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandLineLayout"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "enable_sort": {
           "description": "Sort arguments in keyword sections marked `sortable` in the command spec.",
           "type": [
@@ -378,6 +390,21 @@
           "description": "Continuation lines align under the first value after the\nkeyword (cmake-format's hanging-indent style). The default.",
           "type": "string",
           "const": "under-first-value"
+        }
+      ]
+    },
+    "CommandLineLayout": {
+      "description": "How to lay out keyword sections that the command spec marks as\n`command_line`, such as `COMMAND` in `add_custom_command`.\n\nOnly takes effect once a call no longer fits on one line:\n\n```cmake\n# Standard — like any other keyword section:\nadd_custom_command(\n  OUTPUT a.txt\n  COMMAND ${CMAKE_COMMAND} -E touch a.txt\n  COMMAND\n    ${CMAKE_COMMAND}\n    -E\n    copy_if_different\n    ${a}\n    ${b}\n    ${c}\n    ${dst})\n\n# OwnLine — keyword alone, command filled below it:\nadd_custom_command(\n  OUTPUT a.txt\n  COMMAND\n    ${CMAKE_COMMAND} -E touch a.txt\n  COMMAND\n    ${CMAKE_COMMAND} -E copy_if_different ${a} ${b} ${c} ${dst})\n```\n\ncmakefmt defaults to [`CommandLineLayout::Standard`], which is the\nbackwards-compatible layout.",
+      "oneOf": [
+        {
+          "description": "Command lines are laid out like any other keyword section: on the\nkeyword's line when they fit, otherwise below it, one argument per\nline once they have more arguments than\n[`Config::max_pargs_hwrap`]. The default.",
+          "type": "string",
+          "const": "standard"
+        },
+        {
+          "description": "The keyword always goes on a line of its own and the command is\nfilled onto as few lines as possible below it, whatever its length,\nso every command of a call starts the same way.",
+          "type": "string",
+          "const": "own-line"
         }
       ]
     },
@@ -619,6 +646,17 @@
           "anyOf": [
             {
               "$ref": "#/$defs/ContinuationAlign"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "command_line_layout": {
+          "description": "Override the layout of command-line keyword sections for this\ncommand.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandLineLayout"
             },
             {
               "type": "null"

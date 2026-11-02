@@ -119,6 +119,7 @@ commands:
         nargs: "*"
       COMMAND:
         nargs: "+"
+        command_line: true
       COMMENT:
         nargs: 1
       DEPENDS:
@@ -142,6 +143,7 @@ commands:
         nargs: "*"
       COMMAND:
         nargs: "+"
+        command_line: true
       COMMENT:
         nargs: 1
       DEPENDS:
@@ -476,6 +478,7 @@ commands:
     kwargs:
       COMMAND:
         nargs: "+"
+        command_line: true
       COMMAND_ECHO:
         nargs: 1
       COMMAND_ERROR_IS_FATAL:
@@ -1411,6 +1414,7 @@ commands:
             nargs: 1
           COMMAND:
             nargs: "+"
+            command_line: true
           CONFIGURATIONS:
             nargs: "+"
           WORKING_DIRECTORY:

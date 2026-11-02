@@ -660,7 +660,10 @@ fn try_format_grouped(
                     .any(|arg| arg.is_comment() || argument_has_newline(arg))
                 || section.header.is_some_and(|header| {
                     lookup_kwarg(form, header).is_some_and(|spec| {
-                        spec.pairwise || !spec.kwargs.is_empty() || !spec.flags.is_empty()
+                        spec.pairwise
+                            || !spec.kwargs.is_empty()
+                            || !spec.flags.is_empty()
+                            || is_own_line_command(spec, cmd_config)
                     })
                 })
         })
@@ -915,7 +918,11 @@ fn write_sections(
             }
             Some(header_raw) => {
                 let header = apply_case(cmd_config.keyword_case(), header_raw);
-                if section.arguments.is_empty() {
+                let parent_spec = lookup_kwarg(form, header_raw);
+                let command_line =
+                    parent_spec.is_some_and(|spec| is_own_line_command(spec, cmd_config));
+                let arguments = &section.arguments[..];
+                if arguments.is_empty() {
                     output.push_str(section_indent);
                     output.push_str(&header);
                     output.push('\n');
@@ -924,7 +931,6 @@ fn write_sections(
 
                 output.push_str(section_indent);
                 output.push_str(&header);
-                let parent_spec = lookup_kwarg(form, header_raw);
                 if parent_spec.is_some_and(|spec| spec.pairwise) {
                     output.push('\n');
                     write_paired_arguments(output, &section.arguments, nested_indent, ctx);
@@ -935,20 +941,22 @@ fn write_sections(
                 let file_set = ctx.command_name.eq_ignore_ascii_case("target_sources")
                     && header_raw.eq_ignore_ascii_case("FILE_SET")
                     && grouped_spec.is_some();
-                if file_set || section.arguments.len() > cmd_config.max_pargs_hwrap() {
+                if command_line {
+                    // A command line is one unit, not a list: never one
+                    // argument per line, and never on the header line either,
+                    // so that every command of a wrapped call starts the same
+                    // way. The header stands alone and the command is filled
+                    // below it.
+                    output.push('\n');
+                    write_packed_arguments(output, arguments, nested_indent, ctx);
+                } else if file_set || arguments.len() > cmd_config.max_pargs_hwrap() {
                     if let Some(spec) = grouped_spec {
-                        write_header_line_and_group(
-                            output,
-                            &section.arguments,
-                            spec,
-                            nested_indent,
-                            ctx,
-                        );
+                        write_header_line_and_group(output, arguments, spec, nested_indent, ctx);
                     } else {
                         output.push('\n');
                         write_vertical_arguments(
                             output,
-                            &section.arguments,
+                            arguments,
                             nested_indent,
                             ctx.config(),
                             ctx.patterns,
@@ -956,7 +964,7 @@ fn write_sections(
                     }
                 } else if let Some(line) = format_section_inline(
                     &header,
-                    &section.arguments,
+                    arguments,
                     section_indent,
                     ctx.config(),
                     ctx.patterns,
@@ -966,22 +974,16 @@ fn write_sections(
                     output.push_str(&line);
                     output.push('\n');
                 } else if let Some(spec) = grouped_spec {
-                    write_header_line_and_group(
-                        output,
-                        &section.arguments,
-                        spec,
-                        nested_indent,
-                        ctx,
-                    );
+                    write_header_line_and_group(output, arguments, spec, nested_indent, ctx);
                 } else if let Some(wrapped) =
-                    format_section_hanging(&header, &section.arguments, section_indent, ctx)
+                    format_section_hanging(&header, arguments, section_indent, ctx)
                 {
                     output.truncate(output.len() - section_indent.len() - header.len());
                     output.push_str(&wrapped);
                     output.push('\n');
                 } else {
                     output.push('\n');
-                    write_packed_arguments(output, &section.arguments, nested_indent, ctx);
+                    write_packed_arguments(output, arguments, nested_indent, ctx);
                 }
             }
         }
@@ -1355,14 +1357,21 @@ fn write_grouped_arguments(
         // Variable-length nested lists have the same vertical threshold as
         // top-level keyword lists. Keep fixed header/value pairs attached.
         let nested_spec = lookup_nested_kwarg_in(parent_spec, group[0].as_str());
-        if nested_spec.is_some_and(|spec| {
-            matches!(
-                spec.nargs,
-                NArgs::ZeroOrMore | NArgs::OneOrMore | NArgs::AtLeast(_)
-            )
-        }) && group[1..].iter().filter(|arg| !arg.is_comment()).count()
-            > ctx.cmd_config.max_pargs_hwrap()
-        {
+        // A nested command line gets its header on its own line and is filled
+        // below it, as at the top level (see `write_sections`).
+        let command_line = nested_spec
+            .is_some_and(|spec| is_own_line_command(spec, ctx.cmd_config))
+            && group.len() > 1;
+        let vertical_list = !command_line
+            && nested_spec.is_some_and(|spec| {
+                matches!(
+                    spec.nargs,
+                    NArgs::ZeroOrMore | NArgs::OneOrMore | NArgs::AtLeast(_)
+                )
+            })
+            && group[1..].iter().filter(|arg| !arg.is_comment()).count()
+                > ctx.cmd_config.max_pargs_hwrap();
+        if command_line || vertical_list {
             output.push_str(indent);
             output.push_str(&apply_case(
                 ctx.cmd_config.keyword_case(),
@@ -1370,13 +1379,17 @@ fn write_grouped_arguments(
             ));
             output.push('\n');
             let value_indent = format!("{indent}{}", ctx.cmd_config.indent_str());
-            write_vertical_arguments(
-                output,
-                &group[1..],
-                &value_indent,
-                ctx.config(),
-                ctx.patterns,
-            );
+            if command_line {
+                write_packed_arguments(output, &group[1..], &value_indent, ctx);
+            } else {
+                write_vertical_arguments(
+                    output,
+                    &group[1..],
+                    &value_indent,
+                    ctx.config(),
+                    ctx.patterns,
+                );
+            }
             i = end;
             continue;
         }
@@ -1913,6 +1926,13 @@ fn ci_get<'a, T>(map: &'a indexmap::IndexMap<String, T>, token: &str) -> Option<
 /// token has any lowercase.
 fn ci_set_contains(set: &indexmap::IndexSet<String>, token: &str) -> bool {
     set.contains(token) || (has_ascii_lowercase(token) && set.contains(&token.to_ascii_uppercase()))
+}
+
+/// Whether a keyword section is a command line to be laid out with its
+/// keyword on a line of its own, see [`crate::config::CommandLineLayout`].
+fn is_own_line_command(spec: &crate::spec::KwargSpec, cmd_config: &CommandConfig<'_>) -> bool {
+    spec.command_line
+        && cmd_config.command_line_layout() == crate::config::CommandLineLayout::OwnLine
 }
 
 fn lookup_kwarg<'a>(form: &'a CommandForm, token: &str) -> Option<&'a crate::spec::KwargSpec> {

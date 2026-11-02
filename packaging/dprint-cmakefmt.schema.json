@@ -24,6 +24,7 @@
         "wrapAfterFirstArg": { "type": "boolean" },
         "wrapAfterFirstArgAlign": { "enum": ["under-first-arg", "default-indent"], "default": "under-first-arg" },
         "continuationAlign": { "enum": ["same-indent", "under-first-value"] },
+        "commandLineLayout": { "enum": ["standard", "own-line"], "default": "standard" },
         "enableSort": { "type": "boolean" },
         "autosort": { "type": "boolean" },
         "argumentCommentStyle": { "enum": ["preserve", "standalone"], "default": "preserve" },

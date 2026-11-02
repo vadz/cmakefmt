@@ -7,8 +7,8 @@ use std::path::PathBuf;
 
 use cmakefmt::spec::registry::CommandRegistry;
 use cmakefmt::{
-    format_source, format_source_with_registry, CaseStyle, Config, ContinuationAlign, DangleAlign,
-    PerCommandConfig, WrapAfterFirstArgAlign,
+    format_source, format_source_with_registry, CaseStyle, CommandLineLayout, Config,
+    ContinuationAlign, DangleAlign, PerCommandConfig, WrapAfterFirstArgAlign,
 };
 use cmakefmt::{formatter, parser};
 
@@ -2435,6 +2435,281 @@ nargs = "+"
       LIBRARIES spdlog::spdlog
       HIDDEN_LIBRARIES special_hidden_library)
     "#);
+}
+
+#[test]
+fn command_line_sections_fill_while_list_sections_stay_vertical() {
+    // `max_pargs_hwrap = 0` puts every list one element per line, but with
+    // `command_line_layout: own-line` a `COMMAND` is a single command line:
+    // it is filled below its keyword, not exploded one token per line.
+    let src = "\
+add_custom_command(
+  OUTPUT a.txt b.txt c.txt
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${srcs} ${dst}
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${3RDPARTY_DIR}/build/firebird/fbembed.conf ${fb_out}/firebird.conf
+  DEPENDS dep1 dep2 dep3
+)
+";
+    let config = Config {
+        max_pargs_hwrap: 0,
+        command_line_layout: CommandLineLayout::OwnLine,
+        ..Config::default()
+    };
+    let formatted = format_source(src, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    add_custom_command(
+      OUTPUT
+        a.txt
+        b.txt
+        c.txt
+      COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different ${srcs} ${dst}
+      COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+        ${3RDPARTY_DIR}/build/firebird/fbembed.conf ${fb_out}/firebird.conf
+      DEPENDS
+        dep1
+        dep2
+        dep3)
+    ");
+}
+
+#[test]
+fn command_line_sections_of_one_call_share_the_same_shape() {
+    // Once the call wraps, every command line gets its header on its own
+    // line, so a short `COMMAND` doesn't stay inline next to wrapped ones and
+    // the start of each command is easy to spot. A call that fits on one line
+    // is unaffected.
+    let src = "\
+add_custom_target(foo COMMAND echo hi)
+add_custom_command(OUTPUT a.txt COMMAND ${CMAKE_COMMAND} -E touch a.txt DEPENDS b.txt)
+add_custom_command(
+  OUTPUT ${opscore_xlsm}
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${opscore_stage_files} ${opscore_xls_stage}/
+  COMMAND ${CMAKE_COMMAND} -E rm -f ${opscore_xlsm}
+  COMMAND $<TARGET_FILE:runsingle> --verbose --unique-name com.ito33.opscore -- cscript //nologo ${opscore_vbs} ${opscore_style} ${opscorecom_tlb}
+)
+";
+    let config = Config {
+        command_line_layout: CommandLineLayout::OwnLine,
+        ..Config::default()
+    };
+    let formatted = format_source(src, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    add_custom_target(foo COMMAND echo hi)
+    add_custom_command(
+      OUTPUT a.txt
+      COMMAND
+        ${CMAKE_COMMAND} -E touch a.txt
+      DEPENDS b.txt)
+    add_custom_command(
+      OUTPUT ${opscore_xlsm}
+      COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different ${opscore_stage_files}
+        ${opscore_xls_stage}/
+      COMMAND
+        ${CMAKE_COMMAND} -E rm -f ${opscore_xlsm}
+      COMMAND
+        $<TARGET_FILE:runsingle> --verbose --unique-name com.ito33.opscore --
+        cscript //nologo ${opscore_vbs} ${opscore_style} ${opscorecom_tlb})
+    ");
+
+    // The grouped layout would pack several sections on one line, which a
+    // command line doesn't allow either.
+    let config = Config {
+        max_subgroups_hwrap: 6,
+        command_line_layout: CommandLineLayout::OwnLine,
+        ..Config::default()
+    };
+    let formatted = format_source(src, &config).unwrap();
+    insta::assert_snapshot!(formatted, @r"
+    add_custom_target(foo COMMAND echo hi)
+    add_custom_command(
+      OUTPUT a.txt
+      COMMAND
+        ${CMAKE_COMMAND} -E touch a.txt
+      DEPENDS b.txt)
+    add_custom_command(
+      OUTPUT ${opscore_xlsm}
+      COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different ${opscore_stage_files}
+        ${opscore_xls_stage}/
+      COMMAND
+        ${CMAKE_COMMAND} -E rm -f ${opscore_xlsm}
+      COMMAND
+        $<TARGET_FILE:runsingle> --verbose --unique-name com.ito33.opscore --
+        cscript //nologo ${opscore_vbs} ${opscore_style} ${opscorecom_tlb})
+    ");
+}
+
+#[test]
+fn command_line_layout_defaults_to_standard() {
+    // By default command lines are laid out like any other keyword section,
+    // as before `command_line_layout` existed; the option can be enabled for
+    // individual commands.
+    let src = "\
+add_custom_command(
+  OUTPUT a.txt
+  COMMAND ${CMAKE_COMMAND} -E touch a.txt
+  # Copy the sources.
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different a.c b.c c.c ${dst}
+)
+add_custom_target(copy COMMAND ${CMAKE_COMMAND} -E copy_if_different a.c b.c c.c ${dst} WORKING_DIRECTORY ${dir})
+";
+    let formatted = format_source(src, &Config::default()).unwrap();
+    insta::assert_snapshot!(formatted, @r"
+    add_custom_command(
+      OUTPUT a.txt
+      COMMAND
+        ${CMAKE_COMMAND} -E touch a.txt
+        # Copy the sources.
+      COMMAND
+        ${CMAKE_COMMAND}
+        -E
+        copy_if_different
+        a.c
+        b.c
+        c.c
+        ${dst})
+    add_custom_target(
+      copy
+      COMMAND
+        ${CMAKE_COMMAND}
+        -E
+        copy_if_different
+        a.c
+        b.c
+        c.c
+        ${dst}
+      WORKING_DIRECTORY ${dir})
+    ");
+
+    let mut config = Config::default();
+    config.per_command_overrides.insert(
+        "add_custom_command".into(),
+        PerCommandConfig {
+            command_line_layout: Some(CommandLineLayout::OwnLine),
+            ..PerCommandConfig::default()
+        },
+    );
+    let formatted = format_source(src, &config).unwrap();
+    insta::assert_snapshot!(formatted, @r"
+    add_custom_command(
+      OUTPUT a.txt
+      COMMAND
+        ${CMAKE_COMMAND} -E touch a.txt
+        # Copy the sources.
+      COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different a.c b.c c.c ${dst})
+    add_custom_target(
+      copy
+      COMMAND
+        ${CMAKE_COMMAND}
+        -E
+        copy_if_different
+        a.c
+        b.c
+        c.c
+        ${dst}
+      WORKING_DIRECTORY ${dir})
+    ");
+}
+
+#[test]
+fn command_line_sections_in_discriminated_and_module_commands() {
+    // `add_test` carries `COMMAND` under its `NAME` form; `ExternalProject_Add`
+    // has several `*_COMMAND` keywords next to list keywords like `CMAKE_ARGS`.
+    let src = "\
+add_test(NAME unit COMMAND unit_tests --gtest_filter=Foo.* --gtest_output=xml:${CMAKE_BINARY_DIR}/report.xml --verbose)
+ExternalProject_Add(zlib URL https://zlib.net/zlib.tar.gz CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release INSTALL_COMMAND ${CMAKE_COMMAND} --install . --prefix ${ZLIB_PREFIX})
+";
+    let config = Config {
+        max_pargs_hwrap: 0,
+        command_line_layout: CommandLineLayout::OwnLine,
+        ..Config::default()
+    };
+    let formatted = format_source(src, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    add_test(
+      NAME
+        unit
+      COMMAND
+        unit_tests --gtest_filter=Foo.*
+        --gtest_output=xml:${CMAKE_BINARY_DIR}/report.xml --verbose)
+    externalproject_add(
+      zlib
+      URL
+        https://zlib.net/zlib.tar.gz
+      CMAKE_ARGS
+        -DCMAKE_BUILD_TYPE=Release
+        -DBUILD_SHARED_LIBS=OFF
+      BUILD_COMMAND
+        ${CMAKE_COMMAND} --build . --config Release
+      INSTALL_COMMAND
+        ${CMAKE_COMMAND} --install . --prefix ${ZLIB_PREFIX})
+    ");
+}
+
+#[test]
+fn command_line_spec_property_can_be_overridden() {
+    let src = "\
+add_custom_command(OUTPUT out.txt COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/in.txt out.txt)
+my_step(tgt STEP build RUN ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all FILES a.c b.c)
+";
+    let config = Config {
+        max_pargs_hwrap: 0,
+        command_line_layout: CommandLineLayout::OwnLine,
+        ..Config::default()
+    };
+    let mut registry = CommandRegistry::load().unwrap();
+    // Turn the built-in property off for one keyword, and on for a nested
+    // keyword of a user-defined command.
+    registry
+        .merge_yaml_overrides(
+            "\
+commands:
+  add_custom_command:
+    kwargs:
+      COMMAND:
+        command_line: false
+  my_step:
+    pargs: 1
+    kwargs:
+      STEP:
+        nargs: 1
+        kwargs:
+          RUN:
+            nargs: \"+\"
+            command_line: true
+          FILES:
+            nargs: \"+\"
+",
+        )
+        .unwrap();
+    let formatted = format_source_with_registry(src, &config, &registry).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    add_custom_command(
+      OUTPUT
+        out.txt
+      COMMAND
+        ${CMAKE_COMMAND}
+        -E
+        copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/in.txt
+        out.txt)
+    my_step(
+      tgt
+      STEP build
+        RUN
+          ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
+        FILES
+          a.c
+          b.c)
+    ");
 }
 
 // --- Config tests ---

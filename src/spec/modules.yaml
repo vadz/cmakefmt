@@ -136,17 +136,21 @@ commands:
       # Download — explicit override
       DOWNLOAD_COMMAND:
         nargs: "+"
+        command_line: true
       # Update
       UPDATE_COMMAND:
         nargs: "+"
+        command_line: true
       UPDATE_DISCONNECTED:
         nargs: 1
       # Patch
       PATCH_COMMAND:
         nargs: "+"
+        command_line: true
       # Configure
       CONFIGURE_COMMAND:
         nargs: "+"
+        command_line: true
       CMAKE_COMMAND:
         nargs: 1
       CMAKE_GENERATOR:
@@ -170,6 +174,7 @@ commands:
       # Build
       BUILD_COMMAND:
         nargs: "+"
+        command_line: true
       BUILD_IN_SOURCE:
         nargs: 1
       BUILD_ALWAYS:
@@ -183,6 +188,7 @@ commands:
       # Install
       INSTALL_COMMAND:
         nargs: "+"
+        command_line: true
       INSTALL_BYPRODUCTS:
         nargs: "+"
       INSTALL_JOB_SERVER_AWARE:
@@ -192,6 +198,7 @@ commands:
       # Test
       TEST_COMMAND:
         nargs: "+"
+        command_line: true
       TEST_BEFORE_INSTALL:
         nargs: 1
       TEST_AFTER_INSTALL:
@@ -245,6 +252,7 @@ commands:
         nargs: "+"
       COMMAND:
         nargs: "+"
+        command_line: true
 
   # from CMake module: ExternalProject
   ExternalProject_Add_Step:
@@ -252,6 +260,7 @@ commands:
     kwargs:
       COMMAND:
         nargs: "+"
+        command_line: true
       COMMENT:
         nargs: 1
       DEPENDEES:
@@ -401,13 +410,16 @@ commands:
       # Explicit override
       DOWNLOAD_COMMAND:
         nargs: "+"
+        command_line: true
       # Update / patch
       UPDATE_COMMAND:
         nargs: "+"
+        command_line: true
       UPDATE_DISCONNECTED:
         nargs: 1
       PATCH_COMMAND:
         nargs: "+"
+        command_line: true
 
   # from CMake module: FetchContent
   FetchContent_MakeAvailable:

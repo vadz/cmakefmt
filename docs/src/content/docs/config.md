@@ -98,6 +98,7 @@ cmakefmt config dump --format toml > .cmakefmt.toml
   - [`wrap_after_first_arg`](#wrap_after_first_arg)
   - [`wrap_after_first_arg_align`](#wrap_after_first_arg_align)
   - [`continuation_align`](#continuation_align)
+  - [`command_line_layout`](#command_line_layout)
   - [`enable_sort`](#enable_sort)
   - [`autosort`](#autosort)
   - [`argument_comment_style`](#argument_comment_style)
@@ -128,6 +129,7 @@ cmakefmt config dump --format toml > .cmakefmt.toml
     - [`pargs`](#pargs)
     - [`flags`](#flags)
     - [`kwargs`](#kwargs)
+    - [`command_line`](#command_line)
     - [`layout`](#layout)
   - [Discriminated commands](#discriminated-commands)
   - [A larger example](#a-larger-example)
@@ -153,6 +155,7 @@ format:
   require_valid_layout: false
   wrap_after_first_arg: false
   wrap_after_first_arg_align: under-first-arg
+  command_line_layout: standard
   enable_sort: false
   autosort: false
   argument_comment_style: preserve
@@ -323,6 +326,11 @@ format:
 
 Required keyword/value pairs such as `FILE_SET HEADERS` and `TYPE HEADERS`
 remain attached. Short calls can still stay inline unless wrapping is forced.
+
+With [`command_line_layout: own-line`](#command_line_layout), keyword sections
+that hold a single command line, such as `COMMAND` in `add_custom_command`, are
+exempt from this threshold: they are filled rather than put one argument per
+line.
 
 ### `max_hanging_wrap_groups`
 
@@ -602,6 +610,81 @@ per_command_overrides:
 ```
 
 Or in a custom spec via `layout.continuation_align`.
+
+### `command_line_layout`
+
+How to lay out keyword sections whose values form a single command line — a
+program followed by its arguments — once their call no longer fits on one line.
+Which keywords these are is set by the [`command_line`](#command_line) property
+in the command spec. The built-in specs mark `COMMAND` in `add_custom_command`,
+`add_custom_target`, `execute_process`, and `add_test`, and the `COMMAND` and
+`*_COMMAND` keywords of `ExternalProject_Add`, `ExternalProject_Add_Step`, and
+`FetchContent_Declare`.
+
+- `standard` (default): command lines are laid out like any other keyword
+  section — on the keyword's line when they fit, and one argument per line once
+  they have more than
+  [`max_hanging_wrap_positional_args`](#max_hanging_wrap_positional_args)
+  arguments.
+- `own-line`: the keyword always goes on a line of its own and the command is
+  filled onto as few lines as possible below it, however short or long it is,
+  so every command of a call starts the same way.
+
+```yaml
+format:
+  command_line_layout: own-line
+```
+
+```cmake
+# standard (default)
+add_custom_command(
+  OUTPUT a.txt
+  COMMAND ${CMAKE_COMMAND} -E touch a.txt
+  COMMAND
+    ${CMAKE_COMMAND}
+    -E
+    copy_if_different
+    ${a}
+    ${b}
+    ${c}
+    ${dst})
+
+# own-line
+add_custom_command(
+  OUTPUT a.txt
+  COMMAND
+    ${CMAKE_COMMAND} -E touch a.txt
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different ${a} ${b} ${c} ${dst})
+```
+
+`own-line` only changes command lines: other keyword sections of the same call
+keep their layout, so it combines with `max_hanging_wrap_positional_args: 0` to
+put list values one per line without breaking commands apart:
+
+```cmake
+add_custom_command(
+  OUTPUT
+    a.txt
+    b.txt
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different ${srcs} ${dst}
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+    ${3RDPARTY_DIR}/build/firebird/fbembed.conf ${fb_out}/firebird.conf
+  DEPENDS
+    dep1
+    dep2)
+```
+
+A call that fits on one line, such as `add_custom_target(foo COMMAND echo hi)`,
+is not affected. With `own-line`, a command line also keeps its call out of
+the compact layout enabled by
+[`max_hanging_wrap_groups`](#max_hanging_wrap_groups), which would put several
+keywords on one line.
+
+Can also be set for individual commands under
+[`per_command_overrides`](#per-command-overrides).
 
 ### `enable_sort`
 
@@ -977,6 +1060,7 @@ Supported override fields:
 - `dangle_align`
 - `max_hanging_wrap_positional_args`
 - `max_hanging_wrap_groups`
+- `command_line_layout`
 
 Use this when you want a command to format differently from the global defaults.
 Do **not** use it to define a command's argument structure — that belongs in
@@ -1167,6 +1251,39 @@ A pairwise section consumes all remaining arguments; keyword-like property
 names and values remain data. Use it only for terminal key/value lists.
 Partial overrides retain a built-in's `pairwise` setting unless explicitly
 changed. Set `pairwise: false` to restore ordinary list wrapping for a section.
+
+#### `command_line`
+
+Set `command_line: true` on a keyword whose values form a single command line
+— a program followed by its arguments — rather than a list of independent
+items. How such sections are laid out is controlled by
+[`command_line_layout`](#command_line_layout); with the default `standard`
+layout, the property has no effect. It works for nested keywords too.
+
+```yaml
+commands:
+  my_add_step:
+    pargs: 1
+    kwargs:
+      RUN:
+        nargs: "+"
+        command_line: true   # one command line
+      OUTPUTS:
+        nargs: "+"           # a list
+```
+
+The built-in `COMMAND` keywords listed under
+[`command_line_layout`](#command_line_layout) already carry it. To keep the
+standard layout for one of them while using `own-line`, override it with
+`command_line: false`:
+
+```yaml
+commands:
+  add_custom_command:
+    kwargs:
+      COMMAND:
+        command_line: false
+```
 
 #### `layout`
 

@@ -574,6 +574,10 @@ fn merge_kwarg(base: &mut KwargSpec, override_kwarg: KwargSpecOverride) {
         base.nargs = nargs;
     }
 
+    if let Some(command_line) = override_kwarg.command_line {
+        base.command_line = command_line;
+    }
+
     merge_flags(&mut base.flags, override_kwarg.flags);
 
     for (name, nested_override) in override_kwarg.kwargs {
@@ -673,6 +677,52 @@ mod tests {
             assert_eq!(registry.get(command).form_for(None).pargs, pargs);
             assert_eq!(registry.get(command).form_for(Some("UNKNOWN")).pargs, pargs);
         }
+    }
+
+    #[test]
+    fn builtin_command_line_keywords() {
+        let registry = CommandRegistry::load().unwrap();
+        let is_command_line = |command: &str, first_arg: Option<&str>, keyword: &str| {
+            registry.get(command).form_for(first_arg).kwargs[keyword].command_line
+        };
+        for (command, list_keyword) in [
+            ("add_custom_command", "DEPENDS"),
+            ("add_custom_target", "DEPENDS"),
+            ("execute_process", "OUTPUT_VARIABLE"),
+        ] {
+            assert!(is_command_line(command, None, "COMMAND"), "{command}");
+            assert!(!is_command_line(command, None, list_keyword), "{command}");
+        }
+        assert!(is_command_line("add_test", Some("NAME"), "COMMAND"));
+        assert!(!is_command_line("add_test", Some("NAME"), "CONFIGURATIONS"));
+        assert!(is_command_line(
+            "externalproject_add",
+            None,
+            "BUILD_COMMAND"
+        ));
+        assert!(!is_command_line("externalproject_add", None, "CMAKE_ARGS"));
+        assert!(is_command_line("externalproject_add_step", None, "COMMAND"));
+        assert!(is_command_line(
+            "fetchcontent_declare",
+            None,
+            "PATCH_COMMAND"
+        ));
+    }
+
+    #[test]
+    fn command_line_override_merges_into_builtin() {
+        let mut registry = CommandRegistry::load().unwrap();
+        registry
+            .merge_yaml_overrides(
+                "commands:\n  add_custom_command:\n    kwargs:\n      COMMAND:\n        command_line: false\n      DEPENDS:\n        command_line: true\n",
+            )
+            .unwrap();
+        let form = registry.get("add_custom_command").form_for(None);
+        assert!(!form.kwargs["COMMAND"].command_line);
+        assert!(form.kwargs["DEPENDS"].command_line);
+        // The rest of the built-in spec is untouched by the partial override.
+        assert_eq!(form.kwargs["COMMAND"].nargs, NArgs::OneOrMore);
+        assert!(form.kwargs.contains_key("OUTPUT"));
     }
 
     #[test]

@@ -179,6 +179,14 @@ pub struct KwargSpec {
     /// calls put each pair on its own line and never sort individual tokens.
     #[serde(default)]
     pub pairwise: bool,
+    /// When `true`, the arguments of this section form a single command
+    /// line — e.g. `COMMAND` in `add_custom_command` — whose tokens only
+    /// make sense read together. Such a section is never laid out one
+    /// argument per line because of `max_pargs_hwrap`: it stays on the
+    /// keyword's line when it fits and is otherwise filled onto as few
+    /// lines as possible.
+    #[serde(default)]
+    pub command_line: bool,
 }
 
 /// One fully resolved command form.
@@ -360,6 +368,12 @@ pub(crate) struct KwargSpecOverride {
     /// setting when this field is omitted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pairwise: Option<bool>,
+    /// Mark (or, with `false`, unmark) this keyword section as a single
+    /// command line that is filled rather than listed one argument per
+    /// line. Optional so that an override can turn off the built-in
+    /// setting.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command_line: Option<bool>,
 }
 
 /// Partial override for a command form.
@@ -469,6 +483,7 @@ impl KwargSpecOverride {
             sortable: self.sortable,
             no_autosort: self.no_autosort,
             pairwise: self.pairwise.unwrap_or(false),
+            command_line: self.command_line.unwrap_or_default(),
         }
     }
 }

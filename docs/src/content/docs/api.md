@@ -56,6 +56,7 @@ The most important items today:
 - `PerCommandConfig`
 - `ContinuationAlign`
 - `WrapAfterFirstArgAlign`
+- `CommandLineLayout`
 - `Error`
 - `Result`
 

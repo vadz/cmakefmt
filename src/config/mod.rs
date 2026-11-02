@@ -174,6 +174,53 @@ pub enum WrapAfterFirstArgAlign {
     UnderFirstArg,
 }
 
+/// How to lay out keyword sections that the command spec marks as
+/// `command_line`, such as `COMMAND` in `add_custom_command`.
+///
+/// Only takes effect once a call no longer fits on one line:
+///
+/// ```cmake
+/// # Standard — like any other keyword section:
+/// add_custom_command(
+///   OUTPUT a.txt
+///   COMMAND ${CMAKE_COMMAND} -E touch a.txt
+///   COMMAND
+///     ${CMAKE_COMMAND}
+///     -E
+///     copy_if_different
+///     ${a}
+///     ${b}
+///     ${c}
+///     ${dst})
+///
+/// # OwnLine — keyword alone, command filled below it:
+/// add_custom_command(
+///   OUTPUT a.txt
+///   COMMAND
+///     ${CMAKE_COMMAND} -E touch a.txt
+///   COMMAND
+///     ${CMAKE_COMMAND} -E copy_if_different ${a} ${b} ${c} ${dst})
+/// ```
+///
+/// cmakefmt defaults to [`CommandLineLayout::Standard`], which is the
+/// backwards-compatible layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum, schemars::JsonSchema))]
+#[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
+pub enum CommandLineLayout {
+    /// Command lines are laid out like any other keyword section: on the
+    /// keyword's line when they fit, otherwise below it, one argument per
+    /// line once they have more arguments than
+    /// [`Config::max_pargs_hwrap`]. The default.
+    #[default]
+    Standard,
+    /// The keyword always goes on a line of its own and the command is
+    /// filled onto as few lines as possible below it, whatever its length,
+    /// so every command of a call starts the same way.
+    OwnLine,
+}
+
 /// How to align the dangling closing paren.
 ///
 /// Only takes effect when [`Config::dangle_parens`] is `true`.
@@ -344,6 +391,10 @@ pub struct Config {
     /// per-command via `per_command_overrides` or the spec's
     /// `layout.continuation_align`.
     pub continuation_align: ContinuationAlign,
+    /// How to lay out keyword sections marked `command_line` in the
+    /// command spec once their call wraps. Can be overridden per-command
+    /// via `per_command_overrides`.
+    pub command_line_layout: CommandLineLayout,
     /// Sort arguments in keyword sections marked `sortable` in the
     /// command spec. Sorting is lexicographic and case-insensitive.
     pub enable_sort: bool,
@@ -449,6 +500,9 @@ pub struct PerCommandConfig {
     pub wrap_after_first_arg_align: Option<WrapAfterFirstArgAlign>,
     /// Override the continuation-alignment rule for this command.
     pub continuation_align: Option<ContinuationAlign>,
+    /// Override the layout of command-line keyword sections for this
+    /// command.
+    pub command_line_layout: Option<CommandLineLayout>,
 }
 
 impl Default for Config {
@@ -470,6 +524,7 @@ impl Default for Config {
             wrap_after_first_arg: false,
             wrap_after_first_arg_align: WrapAfterFirstArgAlign::UnderFirstArg,
             continuation_align: ContinuationAlign::UnderFirstValue,
+            command_line_layout: CommandLineLayout::Standard,
             enable_sort: false,
             autosort: false,
             argument_comment_style: ArgumentCommentStyle::Preserve,
@@ -768,6 +823,16 @@ impl CommandConfig<'_> {
             .unwrap_or(self.global.continuation_align)
     }
 
+    /// Effective layout of command-line keyword sections for the current
+    /// command.
+    ///
+    /// Resolution order: per-command user override > global config default.
+    pub fn command_line_layout(&self) -> CommandLineLayout {
+        self.per_cmd
+            .and_then(|p| p.command_line_layout)
+            .unwrap_or(self.global.command_line_layout)
+    }
+
     /// Effective indentation unit for the current command.
     pub fn indent_str(&self) -> String {
         if self.global.use_tabchars {
@@ -906,6 +971,7 @@ mod tests {
                 wrap_after_first_arg: None,
                 wrap_after_first_arg_align: None,
                 continuation_align: None,
+                command_line_layout: None,
             },
         );
         let config = Config {

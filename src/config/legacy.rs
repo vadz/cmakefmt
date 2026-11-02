@@ -15,8 +15,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::config::{
-    file::DumpConfigFormat, CaseStyle, ContinuationAlign, DangleAlign, FractionalTabPolicy,
-    LineEnding, PerCommandConfig, WrapAfterFirstArgAlign,
+    file::DumpConfigFormat, CaseStyle, CommandLineLayout, ContinuationAlign, DangleAlign,
+    FractionalTabPolicy, LineEnding, PerCommandConfig, WrapAfterFirstArgAlign,
 };
 use crate::error::{Error, IoResultExt, Result};
 use crate::spec::{
@@ -778,6 +778,8 @@ struct OutputFormatSection {
     wrap_after_first_arg_align: Option<WrapAfterFirstArgAlign>,
     #[serde(skip_serializing_if = "Option::is_none")]
     continuation_align: Option<ContinuationAlign>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    command_line_layout: Option<CommandLineLayout>,
 }
 
 impl OutputFormatSection {
@@ -808,6 +810,7 @@ impl OutputFormatSection {
             || self.wrap_after_first_arg.is_some()
             || self.wrap_after_first_arg_align.is_some()
             || self.continuation_align.is_some()
+            || self.command_line_layout.is_some()
     }
 }
 
@@ -968,6 +971,9 @@ fn merge_format_section(converted: &mut ConvertedConfig, path: &Path, value: &Le
             }
             "continuation_align" => {
                 converted.format.continuation_align = as_continuation_align(value)
+            }
+            "command_line_layout" => {
+                converted.format.command_line_layout = as_command_line_layout(value)
             }
             unsupported => converted.note_unsupported(path, &format!("[format].{unsupported}")),
         }
@@ -1328,6 +1334,14 @@ fn as_wrap_after_first_arg_align(value: &LegacyValue) -> Option<WrapAfterFirstAr
     match value.as_str()?.to_ascii_lowercase().as_str() {
         "default-indent" => Some(WrapAfterFirstArgAlign::DefaultIndent),
         "under-first-arg" => Some(WrapAfterFirstArgAlign::UnderFirstArg),
+        _ => None,
+    }
+}
+
+fn as_command_line_layout(value: &LegacyValue) -> Option<CommandLineLayout> {
+    match value.as_str()?.to_ascii_lowercase().as_str() {
+        "standard" => Some(CommandLineLayout::Standard),
+        "own-line" => Some(CommandLineLayout::OwnLine),
         _ => None,
     }
 }

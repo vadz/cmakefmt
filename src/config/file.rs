@@ -12,8 +12,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::config::{
-    ArgumentCommentStyle, CaseStyle, Config, ContinuationAlign, DangleAlign, FractionalTabPolicy,
-    LineEnding, PerCommandConfig, WrapAfterFirstArgAlign,
+    ArgumentCommentStyle, CaseStyle, CommandLineLayout, Config, ContinuationAlign, DangleAlign,
+    FractionalTabPolicy, LineEnding, PerCommandConfig, WrapAfterFirstArgAlign,
 };
 use crate::error::{Error, IoResultExt, Result};
 
@@ -83,6 +83,8 @@ struct FormatSection {
     wrap_after_first_arg_align: Option<WrapAfterFirstArgAlign>,
     /// How to indent continuation lines: `same-indent` or `under-first-value`.
     continuation_align: Option<ContinuationAlign>,
+    /// Layout of keyword sections marked `command_line` in the spec: `standard` or `own-line`.
+    command_line_layout: Option<CommandLineLayout>,
     /// Sort arguments in keyword sections marked `sortable` in the command spec.
     enable_sort: Option<bool>,
     /// Heuristically infer sortability for keyword sections without explicit annotation.
@@ -281,6 +283,10 @@ fn default_config_template_toml() -> String {
             "# line_width: under-first-value (default, cmake-format hanging-indent) or\n",
             "# same-indent (wrap at the keyword's own indent).\n",
             "# continuation_align = \"same-indent\"\n\n",
+            "# Layout of command lines such as COMMAND in add_custom_command once the\n",
+            "# call wraps: standard (default, like any other keyword) or own-line (the\n",
+            "# keyword on its own line, the command filled below it).\n",
+            "# command_line_layout = \"own-line\"\n\n",
             "# Sort arguments in keyword sections marked sortable in the command spec.\n",
             "# enable_sort = true\n\n",
             "# Heuristically sort keyword sections where all arguments are simple unquoted tokens.\n",
@@ -412,6 +418,7 @@ struct EffectiveFormatSection {
     wrap_after_first_arg: bool,
     wrap_after_first_arg_align: WrapAfterFirstArgAlign,
     continuation_align: ContinuationAlign,
+    command_line_layout: CommandLineLayout,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     enable_sort: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
@@ -462,6 +469,7 @@ impl From<&Config> for EffectiveConfigFile {
                 wrap_after_first_arg: config.wrap_after_first_arg,
                 wrap_after_first_arg_align: config.wrap_after_first_arg_align,
                 continuation_align: config.continuation_align,
+                command_line_layout: config.command_line_layout,
                 enable_sort: config.enable_sort,
                 autosort: config.autosort,
                 argument_comment_style: config.argument_comment_style,
@@ -535,6 +543,10 @@ fn default_config_template_yaml() -> String {
             "  # line_width: under-first-value (default, cmake-format hanging-indent) or\n",
             "  # same-indent (wrap at the keyword's own indent).\n",
             "  # continuation_align: same-indent\n\n",
+            "  # Layout of command lines such as COMMAND in add_custom_command once the\n",
+            "  # call wraps: standard (default, like any other keyword) or own-line (the\n",
+            "  # keyword on its own line, the command filled below it).\n",
+            "  # command_line_layout: own-line\n\n",
             "  # Sort arguments in keyword sections marked sortable in the command spec.\n",
             "  # enable_sort: true\n\n",
             "  # Heuristically sort keyword sections where all arguments are simple unquoted tokens.\n",
@@ -780,6 +792,9 @@ impl Config {
         }
         if let Some(v) = fc.format.continuation_align {
             self.continuation_align = v;
+        }
+        if let Some(v) = fc.format.command_line_layout {
+            self.command_line_layout = v;
         }
         if let Some(v) = fc.format.enable_sort {
             self.enable_sort = v;
@@ -1632,6 +1647,28 @@ per_command_overrides:
             Config::from_yaml_str("format:\n  line_width: 100\n  command_case: upper").unwrap();
         assert_eq!(config.line_width, 100);
         assert_eq!(config.command_case, CaseStyle::Upper);
+    }
+
+    #[test]
+    fn from_yaml_str_command_line_layout() {
+        assert_eq!(
+            Config::default().command_line_layout,
+            CommandLineLayout::Standard
+        );
+        let config = Config::from_yaml_str(
+            "format:\n  command_line_layout: own-line\nper_command_overrides:\n  add_test:\n    command_line_layout: standard\n",
+        )
+        .unwrap();
+        assert_eq!(config.command_line_layout, CommandLineLayout::OwnLine);
+        assert_eq!(
+            config.for_command("add_test").command_line_layout(),
+            CommandLineLayout::Standard
+        );
+        assert_eq!(
+            config.for_command("execute_process").command_line_layout(),
+            CommandLineLayout::OwnLine
+        );
+        assert!(Config::from_yaml_str("format:\n  command_line_layout: fill\n").is_err());
     }
 
     #[test]

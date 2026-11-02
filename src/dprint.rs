@@ -19,8 +19,8 @@ use dprint_core::plugins::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ArgumentCommentStyle, CaseStyle, Config, ContinuationAlign, DangleAlign, LineEnding,
-    WrapAfterFirstArgAlign,
+    ArgumentCommentStyle, CaseStyle, CommandLineLayout, Config, ContinuationAlign, DangleAlign,
+    LineEnding, WrapAfterFirstArgAlign,
 };
 
 /// dprint protocol handler for CMake source files.
@@ -48,6 +48,7 @@ pub struct ResolvedConfig {
     wrap_after_first_arg: bool,
     wrap_after_first_arg_align: WrapAfterFirstArgAlign,
     continuation_align: ContinuationAlign,
+    command_line_layout: CommandLineLayout,
     enable_sort: bool,
     autosort: bool,
     argument_comment_style: ArgumentCommentStyle,
@@ -78,6 +79,7 @@ impl Default for ResolvedConfig {
             wrap_after_first_arg: config.wrap_after_first_arg,
             wrap_after_first_arg_align: config.wrap_after_first_arg_align,
             continuation_align: config.continuation_align,
+            command_line_layout: config.command_line_layout,
             enable_sort: config.enable_sort,
             autosort: config.autosort,
             argument_comment_style: config.argument_comment_style,
@@ -113,6 +115,7 @@ impl ResolvedConfig {
             wrap_after_first_arg: self.wrap_after_first_arg,
             wrap_after_first_arg_align: self.wrap_after_first_arg_align,
             continuation_align: self.continuation_align,
+            command_line_layout: self.command_line_layout,
             enable_sort: self.enable_sort,
             autosort: self.autosort,
             argument_comment_style: self.argument_comment_style,
@@ -251,6 +254,13 @@ impl SyncPluginHandler<ResolvedConfig> for CmakefmtPlugin {
             "continuationAlign",
             &mut resolved.continuation_align,
             parse_continuation_align,
+            &mut diagnostics,
+        );
+        apply_enum(
+            &mut config,
+            "commandLineLayout",
+            &mut resolved.command_line_layout,
+            parse_command_line_layout,
             &mut diagnostics,
         );
         apply_value(
@@ -462,6 +472,14 @@ fn parse_continuation_align(value: &str) -> Result<ContinuationAlign, String> {
     }
 }
 
+fn parse_command_line_layout(value: &str) -> Result<CommandLineLayout, String> {
+    match value {
+        "standard" => Ok(CommandLineLayout::Standard),
+        "own-line" => Ok(CommandLineLayout::OwnLine),
+        _ => Err(format!("expected standard or own-line; found {value:?}")),
+    }
+}
+
 fn parse_dangle_align(value: &str) -> Result<DangleAlign, String> {
     match value {
         "prefix" => Ok(DangleAlign::Prefix),
@@ -653,6 +671,57 @@ mod tests {
                 None
             );
         }
+    }
+
+    #[test]
+    fn command_line_layout_resolves_formats_and_rejects_invalid_values() {
+        let source = "add_custom_command(OUTPUT a.txt COMMAND ${CMAKE_COMMAND} -E touch a.txt DEPENDS b.txt)\n";
+        let standard = "add_custom_command(\n  OUTPUT a.txt\n  COMMAND ${CMAKE_COMMAND} -E touch a.txt\n  DEPENDS b.txt)\n";
+        let own_line = "add_custom_command(\n  OUTPUT a.txt\n  COMMAND\n    ${CMAKE_COMMAND} -E touch a.txt\n  DEPENDS b.txt)\n";
+        for (value, expected) in [
+            (None, standard),
+            (Some("standard"), standard),
+            (Some("own-line"), own_line),
+        ] {
+            let mut config = ConfigKeyMap::new();
+            if let Some(value) = value {
+                config.insert(
+                    "commandLineLayout".into(),
+                    ConfigKeyValue::String(value.into()),
+                );
+            }
+            let result = CmakefmtPlugin.resolve_config(config, &GlobalConfiguration::default());
+            assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+            // The WASM protocol serializes resolved configuration between calls.
+            let serialized = serde_json::to_string(&result.config).unwrap();
+            let resolved: ResolvedConfig = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(result.config, resolved);
+            let request = SyncFormatRequest {
+                file_path: Path::new("CMakeLists.txt"),
+                file_bytes: source.as_bytes().to_vec(),
+                config_id: FormatConfigId::uninitialized(),
+                config: &resolved,
+                range: None,
+                token: &NullCancellationToken,
+            };
+            assert_eq!(
+                CmakefmtPlugin.format(request, |_| Ok(None)).unwrap(),
+                Some(expected.as_bytes().to_vec())
+            );
+        }
+
+        let mut config = ConfigKeyMap::new();
+        config.insert(
+            "commandLineLayout".into(),
+            ConfigKeyValue::String("fill".into()),
+        );
+        let result = CmakefmtPlugin.resolve_config(config, &GlobalConfiguration::default());
+        assert_eq!(result.diagnostics.len(), 1);
+        assert_eq!(result.diagnostics[0].property_name, "commandLineLayout");
+        assert_eq!(
+            result.config.command_line_layout,
+            CommandLineLayout::Standard
+        );
     }
 
     #[test]
