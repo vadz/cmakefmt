@@ -338,8 +338,10 @@ Example error output when a line can't fit within the configured width:
 
 ```text
 error: line 2 is 74 characters wide, exceeding the limit of 40
-hint: set line_width = 74 (or higher), add the command to always_wrap,
-      or disable require_valid_layout
+hint: set line_width = 74 (or higher) or disable require_valid_layout
+hint: always_wrap only helps a command still laid out on one line; it has
+      no effect on a call which is already wrapped, nor on a single
+      argument too long to break
 ```
 
 Useful in CI where you want a hard guarantee that no line exceeds

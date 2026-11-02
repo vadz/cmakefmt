@@ -54,6 +54,16 @@ This project follows a simple changelog discipline:
   `PROPERTIES` properties of `set_source_files_properties`, left a long
   generator expression stranded far to the right. Values which still fit
   beside their keyword are unaffected.
+- Stop `wrap_after_first_arg` from overflowing `line_width`. The first
+  positional argument was kept on the command line whatever its width, so a
+  long one left the call with an opening line past the limit — output which
+  `require_valid_layout` then rejected as invalid. Such an argument now goes
+  on a line of its own, under either `wrap_after_first_arg_align`. An argument
+  wider than `line_width` on its own fits nowhere and still stays on the
+  command line.
+- Correct the hint shown when `require_valid_layout` rejects an overlong line:
+  it recommended adding the command to `always_wrap`, which does nothing for a
+  call that is already wrapped.
 - Recognize `OUTPUT_QUIET`, `ERROR_QUIET`, `OUTPUT_STRIP_TRAILING_WHITESPACE`
   and `ERROR_STRIP_TRAILING_WHITESPACE` as flags of `execute_process()`, and
   `COMMAND_ECHO`, `COMMAND_ERROR_IS_FATAL` and `ENCODING` as its keywords

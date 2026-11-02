@@ -1926,6 +1926,58 @@ fn wrap_after_first_arg_align_default_indent_follows_tab_size() {
 }
 
 #[test]
+fn wrap_after_first_arg_gives_up_when_the_first_arg_overflows() {
+    // Keeping the first argument on the command line is only possible
+    // while the result fits: here it does not, in either alignment, so
+    // the argument goes on a line of its own instead of leaving the call
+    // with an opening line past line_width.
+    let src = "ito33_copy_to_runtime_output(${3RDPARTY_DIR}/NAG/Mark25/${WINDOWS_ARCH_AT_CONFIG_TIME}/bin/ FILES_MATCHING PATTERN \"*.dll\")\n";
+    for align in [
+        WrapAfterFirstArgAlign::DefaultIndent,
+        WrapAfterFirstArgAlign::UnderFirstArg,
+    ] {
+        let config = Config {
+            max_pargs_hwrap: 0,
+            wrap_after_first_arg: true,
+            wrap_after_first_arg_align: align,
+            dangle_parens: true,
+            require_valid_layout: true,
+            ..Config::default()
+        };
+        let formatted = format_source(src, &config).unwrap();
+        assert_eq!(
+            formatted,
+            "ito33_copy_to_runtime_output(\n  ${3RDPARTY_DIR}/NAG/Mark25/${WINDOWS_ARCH_AT_CONFIG_TIME}/bin/\n  FILES_MATCHING\n  PATTERN\n  \"*.dll\"\n)\n",
+            "unexpected output for {align:?}:\n{formatted}"
+        );
+    }
+}
+
+#[test]
+fn wrap_after_first_arg_keeps_a_first_arg_too_long_for_any_line() {
+    // An argument wider than line_width on its own does not fit below the
+    // command line either, so it stays up there: moving it down would add
+    // a line without making anything fit.
+    let src = "my_cmd(${a_single_token_that_is_on_its_own_much_much_longer_than_the_configured_line_width} FILES_MATCHING PATTERN \"*.dll\")\n";
+    let config = Config {
+        max_pargs_hwrap: 0,
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        dangle_parens: true,
+        ..Config::default()
+    };
+    let formatted = format_source(src, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r#"
+    my_cmd(${a_single_token_that_is_on_its_own_much_much_longer_than_the_configured_line_width}
+      FILES_MATCHING
+      PATTERN
+      "*.dll"
+    )
+    "#);
+}
+
+#[test]
 fn wrap_after_first_arg_align_is_inert_without_wrap_after_first_arg() {
     // The alignment only selects where a wrap_after_first_arg
     // continuation starts. With the layout itself off, both modes must

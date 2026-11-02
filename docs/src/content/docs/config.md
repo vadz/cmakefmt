@@ -435,6 +435,13 @@ set(SOURCES
     c.cpp)
 ```
 
+**When the first argument does not fit:** an argument that would push the
+command line past [`line_width`](#line_width) goes on a line of its own
+instead, exactly as it would without this option, so enabling it never
+produces an overlong line. The one exception is an argument wider than
+`line_width` by itself: no line fits it, so it stays attached rather than
+costing a line for nothing.
+
 Override per-command via `per_command_overrides`:
 
 ```yaml

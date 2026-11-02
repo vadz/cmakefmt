@@ -755,7 +755,20 @@ fn format_command_vertical(
         s.header.is_none() && !s.arguments.is_empty() && !s.arguments[0].is_comment()
     });
 
-    if wrap_after_first_arg && first_is_positional {
+    // The first argument can only stay up there while it fits: otherwise the
+    // call would start with a line over `line_width`, and the argument goes
+    // on a line of its own like any other, whichever column the continuation
+    // lines are aligned to.
+    let keep_first_arg_up = wrap_after_first_arg
+        && first_is_positional
+        && first_arg_fits_on_command_line(
+            &sections[0],
+            base_indent.chars().count() + name.chars().count() + 1,
+            indent.chars().count(),
+            cmd_config.line_width(),
+        );
+
+    if keep_first_arg_up {
         let first_section = &sections[0];
 
         // Find the first non-comment argument to keep on the command line.
@@ -886,6 +899,31 @@ fn format_command_vertical(
     close_command_output(&mut output, cmd_config, &base_indent, &name);
 
     Ok(output)
+}
+
+/// Whether `wrap_after_first_arg` can keep the first argument of
+/// `first_section` on the command line, that is at `prefix_width` (past
+/// `name(`), without the line exceeding `line_width`.
+///
+/// An argument which is itself wider than the budget left at `indent_width`
+/// overflows wherever it is put, so it stays on the command line: moving it
+/// down would spend a line without making anything fit.
+fn first_arg_fits_on_command_line(
+    first_section: &Section<'_>,
+    prefix_width: usize,
+    indent_width: usize,
+    line_width: usize,
+) -> bool {
+    let Some(first_arg) = first_section.arguments.iter().find(|a| !a.is_comment()) else {
+        return true;
+    };
+    // Only the first line of a multiline argument shares the command line.
+    let first_line_width = first_arg
+        .as_str()
+        .split('\n')
+        .next()
+        .map_or(0, |line| line.trim_end_matches('\r').chars().count());
+    prefix_width + first_line_width <= line_width || indent_width + first_line_width > line_width
 }
 
 /// Write a sequence of [`Section`]s into `output`, each indented by

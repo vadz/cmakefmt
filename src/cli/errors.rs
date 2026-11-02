@@ -48,7 +48,8 @@ pub(crate) fn render_cli_error(err: &cmakefmt::Error) -> String {
             ..
         } => format!(
             "error: line {line_no} is {width} characters wide, exceeding the limit of {limit}\n\
-             hint: set line_width = {width} (or higher), add the command to always_wrap, or disable require_valid_layout"
+             hint: set line_width = {width} (or higher) or disable require_valid_layout\n\
+             hint: always_wrap only helps a command still laid out on one line; it has no effect on a call which is already wrapped, nor on a single argument too long to break"
         ),
         _ => format!("error: {err}"),
     }
