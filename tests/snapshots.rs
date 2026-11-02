@@ -2545,6 +2545,52 @@ add_custom_command(
 }
 
 #[test]
+fn comment_after_command_line_introduces_the_next_section() {
+    // A standalone comment between two sections, after a command line, is
+    // written at the section indent rather than under the command above.
+    // Inline comments stay attached, and a comment ending the last section
+    // stays inside it.
+    let src = "\
+add_custom_command(
+  OUTPUT ${package_dir}/stamp
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${package_dir}
+  # Start from an empty debug info directory too, as otherwise the files
+  # left by previous builds would accumulate in it.
+  COMMAND ${CMAKE_COMMAND} -E rm -rf ${package_debuginfo_dir}
+  COMMAND ${CMAKE_COMMAND} -E touch ${package_dir}/stamp # trailing
+  # before DEPENDS
+  DEPENDS foo
+  COMMAND ${CMAKE_COMMAND} -E echo done
+  # last
+)
+";
+    let config = Config {
+        command_line_layout: CommandLineLayout::OwnLine,
+        ..Config::default()
+    };
+    let formatted = format_source(src, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    add_custom_command(
+      OUTPUT ${package_dir}/stamp
+      COMMAND
+        ${CMAKE_COMMAND} -E make_directory ${package_dir}
+      # Start from an empty debug info directory too, as otherwise the files
+      # left by previous builds would accumulate in it.
+      COMMAND
+        ${CMAKE_COMMAND} -E rm -rf ${package_debuginfo_dir}
+      COMMAND
+        ${CMAKE_COMMAND} -E touch ${package_dir}/stamp # trailing
+      # before DEPENDS
+      DEPENDS foo
+      COMMAND
+        ${CMAKE_COMMAND} -E echo done
+        # last
+    )
+    ");
+}
+
+#[test]
 fn command_line_layout_defaults_to_standard() {
     // By default command lines are laid out like any other keyword section,
     // as before `command_line_layout` existed; the option can be enabled for
@@ -2600,7 +2646,7 @@ add_custom_target(copy COMMAND ${CMAKE_COMMAND} -E copy_if_different a.c b.c c.c
       OUTPUT a.txt
       COMMAND
         ${CMAKE_COMMAND} -E touch a.txt
-        # Copy the sources.
+      # Copy the sources.
       COMMAND
         ${CMAKE_COMMAND} -E copy_if_different a.c b.c c.c ${dst})
     add_custom_target(

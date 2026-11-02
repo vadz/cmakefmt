@@ -22,7 +22,9 @@ This project follows a simple changelog discipline:
   command filled below it, so that every command of a call has the same shape
   and long commands are no longer put one token per line past
   `max_hanging_wrap_positional_args`. Other keyword sections, such as `OUTPUT`
-  and `DEPENDS`, keep their layout. The option can also be set in
+  and `DEPENDS`, keep their layout. Standalone comments between a command line
+  and the next keyword are written at that keyword's indentation instead of
+  under the command above them. The option can also be set in
   `per_command_overrides` and as `commandLineLayout` in the dprint plugin.
 - Add a `command_line` property for keyword sections in command specs, marking
   the sections that `command_line_layout` applies to. The built-in specs set it

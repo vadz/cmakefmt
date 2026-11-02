@@ -402,7 +402,7 @@
           "const": "standard"
         },
         {
-          "description": "The keyword always goes on a line of its own and the command is\nfilled onto as few lines as possible below it, whatever its length,\nso every command of a call starts the same way.",
+          "description": "The keyword always goes on a line of its own and the command is\nfilled onto as few lines as possible below it, whatever its length,\nso every command of a call starts the same way. Standalone comments\nbetween a command line and the next keyword are written at the\nkeyword's indentation.",
           "type": "string",
           "const": "own-line"
         }

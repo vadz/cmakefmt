@@ -901,7 +901,7 @@ fn write_sections(
     nested_indent: &str,
 ) {
     let cmd_config = ctx.cmd_config;
-    for section in sections {
+    for (index, section) in sections.iter().enumerate() {
         match section.header {
             None => {
                 if section.arguments.len() > cmd_config.max_pargs_hwrap() {
@@ -921,11 +921,20 @@ fn write_sections(
                 let parent_spec = lookup_kwarg(form, header_raw);
                 let command_line =
                     parent_spec.is_some_and(|spec| is_own_line_command(spec, cmd_config));
-                let arguments = &section.arguments[..];
+                // Standalone comments between a command line and the next
+                // section introduce the next section rather than annotate
+                // the command above, so write them at the section indent.
+                let (arguments, next_section_comments) =
+                    if command_line && index + 1 < sections.len() {
+                        split_trailing_standalone_comments(&section.arguments)
+                    } else {
+                        (&section.arguments[..], &[][..])
+                    };
                 if arguments.is_empty() {
                     output.push_str(section_indent);
                     output.push_str(&header);
                     output.push('\n');
+                    write_packed_arguments(output, next_section_comments, section_indent, ctx);
                     continue;
                 }
 
@@ -985,9 +994,21 @@ fn write_sections(
                     output.push('\n');
                     write_packed_arguments(output, arguments, nested_indent, ctx);
                 }
+                write_packed_arguments(output, next_section_comments, section_indent, ctx);
             }
         }
     }
+}
+
+/// Split the run of standalone comments ending `arguments` off the rest.
+fn split_trailing_standalone_comments<'a, 'b>(
+    arguments: &'b [&'a Argument],
+) -> (&'b [&'a Argument], &'b [&'a Argument]) {
+    let kept = arguments
+        .iter()
+        .rposition(|argument| !matches!(argument, Argument::StandaloneComment(_)))
+        .map_or(0, |last| last + 1);
+    arguments.split_at(kept)
 }
 
 /// Once the command has nested, a keyword list can still hang from its header.

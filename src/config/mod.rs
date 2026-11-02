@@ -217,7 +217,9 @@ pub enum CommandLineLayout {
     Standard,
     /// The keyword always goes on a line of its own and the command is
     /// filled onto as few lines as possible below it, whatever its length,
-    /// so every command of a call starts the same way.
+    /// so every command of a call starts the same way. Standalone comments
+    /// between a command line and the next keyword are written at the
+    /// keyword's indentation.
     OwnLine,
 }
 

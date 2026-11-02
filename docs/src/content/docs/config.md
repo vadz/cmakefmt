@@ -683,6 +683,10 @@ the compact layout enabled by
 [`max_hanging_wrap_groups`](#max_hanging_wrap_groups), which would put several
 keywords on one line.
 
+Comments on their own lines after a command line and before the next keyword
+are taken to introduce that keyword, and are written at the keyword's
+indentation rather than under the command above them.
+
 Can also be set for individual commands under
 [`per_command_overrides`](#per-command-overrides).
 
