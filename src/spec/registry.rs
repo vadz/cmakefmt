@@ -547,6 +547,10 @@ fn merge_form(base: &mut CommandForm, override_form: CommandFormOverride) {
         base.pargs = pargs;
     }
 
+    if let Some(first_args) = override_form.first_args {
+        base.first_args = first_args;
+    }
+
     merge_flags(&mut base.flags, override_form.flags);
 
     for (name, override_kwarg) in override_form.kwargs {

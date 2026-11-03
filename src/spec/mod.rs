@@ -197,6 +197,21 @@ pub struct CommandForm {
     /// Number of positional arguments before keyword/flag processing starts.
     #[serde(default)]
     pub pargs: NArgs,
+    /// How many leading positional arguments
+    /// [`crate::Config::wrap_after_first_arg`] keeps on the command line,
+    /// when it applies to this form at all.
+    ///
+    /// One, the default, is what the option is named after and what
+    /// `set(<var> …)` wants. Commands whose first argument only selects a
+    /// subcommand need more: `list(<SUBCOMMAND> <list-var> …)` reads as a
+    /// unit and declares `first_args: 2`. Zero keeps nothing on the command
+    /// line, so the layout does not apply to the form.
+    ///
+    /// This is deliberately not derived from [`Self::pargs`], which
+    /// describes the whole positional run and is unbounded (`"*"`, `"2+"`)
+    /// for exactly the commands the layout exists for.
+    #[serde(default = "default_first_args")]
+    pub first_args: usize,
     /// Recognized top-level keywords for this form.
     #[serde(default)]
     pub kwargs: IndexMap<String, KwargSpec>,
@@ -211,10 +226,19 @@ pub struct CommandForm {
     pub layout: Option<LayoutOverrides>,
 }
 
+/// The default of [`CommandForm::first_args`]: the one argument that
+/// `wrap_after_first_arg` is named after.
+pub const DEFAULT_FIRST_ARGS: usize = 1;
+
+fn default_first_args() -> usize {
+    DEFAULT_FIRST_ARGS
+}
+
 impl Default for CommandForm {
     fn default() -> Self {
         Self {
             pargs: NArgs::ZeroOrMore,
+            first_args: DEFAULT_FIRST_ARGS,
             kwargs: IndexMap::new(),
             flags: IndexSet::new(),
             layout: None,
@@ -383,6 +407,10 @@ pub(crate) struct CommandFormOverride {
     /// Override the positional argument count for the form.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pargs: Option<NArgs>,
+    /// Override how many leading positional arguments
+    /// `wrap_after_first_arg` keeps on the command line.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_args: Option<usize>,
     /// Keyword overrides to merge into the form.
     #[serde(default)]
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
@@ -450,6 +478,7 @@ impl CommandFormOverride {
     pub(crate) fn into_full_form(self) -> CommandForm {
         CommandForm {
             pargs: self.pargs.unwrap_or_default(),
+            first_args: self.first_args.unwrap_or(DEFAULT_FIRST_ARGS),
             kwargs: self
                 .kwargs
                 .into_iter()
@@ -630,6 +659,7 @@ pargs = 2
                 always_wrap: Some(true),
                 ..LayoutOverridesOverride::default()
             }),
+            ..CommandFormOverride::default()
         });
 
         let full = override_spec.into_full_spec();

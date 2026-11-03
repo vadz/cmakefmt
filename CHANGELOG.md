@@ -33,6 +33,16 @@ This project follows a simple changelog discipline:
   `ExternalProject_Add`, `ExternalProject_Add_Step`, and
   `FetchContent_Declare`. Overrides can set it to `false` to exempt a built-in
   keyword.
+- Add a `first_args` field to command specs: how many leading positional
+  arguments `format.wrap_after_first_arg` keeps on the command line. It
+  defaults to one, the argument the option is named after, so nothing changes
+  unless a spec sets it. The built-in `list` spec sets `first_args: 2`,
+  because every `list()` subcommand reads `list(<SUBCOMMAND> <list-var> ...)`
+  and keeping only the subcommand up left the list variable stranded on the
+  line below. `first_args: 0` keeps nothing on the command line, so the option
+  does not apply to the command. When the first arguments are wider than
+  `line_width`, only the ones that fit are kept, so the layout still never
+  starts a call with an overlong line.
 
 ### Fixed
 

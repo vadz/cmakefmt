@@ -445,6 +445,11 @@ commands:
       pargs: "*"
   list:
     pargs: "*"
+    # Every list() subcommand reads list(<SUBCOMMAND> <list-var> ...), so
+    # both belong on the command line when wrap_after_first_arg wraps the
+    # call: the subcommand on its own says nothing about which list it acts
+    # on.
+    first_args: 2
   string:
     forms:
       JSON:

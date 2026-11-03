@@ -127,6 +127,7 @@ cmakefmt config dump --format toml > .cmakefmt.toml
   - [Before and after](#before-and-after)
   - [Spec fields](#spec-fields)
     - [`pargs`](#pargs)
+    - [`first_args`](#first_args)
     - [`flags`](#flags)
     - [`kwargs`](#kwargs)
     - [`command_line`](#command_line)
@@ -395,9 +396,13 @@ includes the line number, actual width, and configured limit.
 
 ### `wrap_after_first_arg`
 
-When wrapping a command across multiple lines, keep the first positional
+When wrapping a command across multiple lines, keep its first positional
 argument on the command line and align continuation lines to the open
 parenthesis. Default: `false`.
+
+A command can ask for more than one argument to stay on the command line
+with the [`first_args`](#first_args) field of its spec. Unless it does, this
+is literally the first argument.
 
 ```yaml
 format:
@@ -435,12 +440,23 @@ set(SOURCES
     c.cpp)
 ```
 
-**When the first argument does not fit:** an argument that would push the
+**Built-in default for `list()`:** `list` declares `first_args: 2`, because every
+one of its subcommands reads `list(<SUBCOMMAND> <list-var> ...)` and the
+subcommand on its own says nothing about which list it acts on:
+
+```cmake
+list(APPEND HTML_DEPS
+     ${PROJECT_SOURCE_DIR}/doc/style.css
+     ${PROJECT_SOURCE_DIR}/doc/docinfo.html)
+```
+
+**When the first arguments do not fit:** an argument that would push the
 command line past [`line_width`](#line_width) goes on a line of its own
 instead, exactly as it would without this option, so enabling it never
-produces an overlong line. The one exception is an argument wider than
-`line_width` by itself: no line fits it, so it stays attached rather than
-costing a line for nothing.
+produces an overlong line; when a spec asks for several first arguments, only
+the ones that fit are kept. The one
+exception is an argument wider than `line_width` by itself: no line fits it,
+so it stays attached rather than costing a line for nothing.
 
 Override per-command via `per_command_overrides`:
 
@@ -1151,6 +1167,29 @@ commands:
   my_command:
     pargs: 2      # exactly two positional args before keywords
 ```
+
+#### `first_args`
+
+How many leading positional arguments
+[`wrap_after_first_arg`](#wrap_after_first_arg) keeps on the command line,
+when it applies to the command at all. Default: `1`.
+
+One is what the option is named after and what `set(<var> ...)` wants.
+Commands whose first argument only selects a subcommand need more — the
+built-in `list` spec declares `first_args: 2` so that
+`list(APPEND <list-var>` stays together. `first_args: 0` keeps nothing on
+the command line, so `wrap_after_first_arg` does not apply to the command.
+
+```yaml
+commands:
+  my_add_module:
+    pargs: "*"
+    first_args: 2 # my_add_module(<group> <name> <sources...>)
+```
+
+This is deliberately separate from [`pargs`](#pargs): `pargs` describes the
+whole positional run, and is unbounded for exactly the commands the layout
+exists for.
 
 #### `flags`
 

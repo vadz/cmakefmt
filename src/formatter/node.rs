@@ -129,7 +129,10 @@ pub(crate) fn format_command(
     let force_vertical = spec_always_wrap || config_always_wrap;
 
     let spec_wrap_first = form.layout.as_ref().and_then(|l| l.wrap_after_first_arg);
-    let wrap_after_first_arg = cmd_config.wrap_after_first_arg(spec_wrap_first);
+    // Zero first arguments asks for nothing on the command line, which is
+    // what turning the option off for this command means.
+    let wrap_after_first_arg =
+        cmd_config.wrap_after_first_arg(spec_wrap_first) && form.first_args > 0;
 
     let spec_continuation = form.layout.as_ref().and_then(|l| l.continuation_align);
     let continuation_align = cmd_config.continuation_align(spec_continuation);
@@ -749,35 +752,27 @@ fn format_command_vertical(
     output.push_str(&name);
 
     // When wrap_after_first_arg is enabled and the first section is
-    // positional (no keyword header), keep the first argument on the
-    // command line and align the rest to the open parenthesis.
+    // positional (no keyword header), keep its first arguments — one
+    // unless the spec's `first_args` says otherwise — on the command line and align the rest to the open parenthesis.
     let first_is_positional = sections.first().is_some_and(|s| {
         s.header.is_none() && !s.arguments.is_empty() && !s.arguments[0].is_comment()
     });
 
-    // The first argument can only stay up there while it fits: otherwise the
-    // call would start with a line over `line_width`, and the argument goes
-    // on a line of its own like any other, whichever column the continuation
-    // lines are aligned to.
-    let keep_first_arg_up = wrap_after_first_arg
-        && first_is_positional
-        && first_arg_fits_on_command_line(
+    let first_args_len = if wrap_after_first_arg && first_is_positional {
+        first_args_on_command_line(
             &sections[0],
+            form.first_args,
             base_indent.chars().count() + name.chars().count() + 1,
             indent.chars().count(),
             cmd_config.line_width(),
-        );
+        )
+    } else {
+        0
+    };
 
-    if keep_first_arg_up {
+    if first_args_len > 0 {
         let first_section = &sections[0];
-
-        // Find the first non-comment argument to keep on the command line.
-        let first_real_idx = first_section
-            .arguments
-            .iter()
-            .position(|a| !a.is_comment())
-            .unwrap_or(0);
-        let first_arg = first_section.arguments[first_real_idx];
+        let first_args = &first_section.arguments[..first_args_len];
         // Where the rest of the call continues: under the first argument,
         // or at the default indentation, as the vertical layout below does.
         let continuation_indent = match ctx.wrap_after_first_arg_align {
@@ -788,32 +783,40 @@ fn format_command_vertical(
         };
 
         output.push('(');
-        // The first argument bypasses the regular multiline writer. Protect
-        // its literal continuation lines from the indentation-to-tabs pass too.
-        // All command writers emit LF internally; the file-level pass applies
-        // the requested line endings once, including inside literal arguments.
-        let first_arg_text = if first_arg.as_str().contains("\r\n") {
-            std::borrow::Cow::Owned(first_arg.as_str().replace("\r\n", "\n"))
-        } else {
-            std::borrow::Cow::Borrowed(first_arg.as_str())
-        };
-        for (index, line) in first_arg_text.split('\n').enumerate() {
-            if index > 0 {
-                output.push('\n');
-                if ctx.config().use_tabchars {
-                    output.push(LITERAL_LINE_MARKER);
-                }
+        // The first arguments bypass the regular multiline writer. Protect
+        // their literal continuation lines from the indentation-to-tabs pass
+        // too. All command writers emit LF internally; the file-level
+        // pass applies the requested line endings once, including inside
+        // literal arguments.
+        for (position, argument) in first_args.iter().enumerate() {
+            if position > 0 {
+                output.push(' ');
             }
-            output.push_str(line);
+            let text = if argument.as_str().contains("\r\n") {
+                std::borrow::Cow::Owned(argument.as_str().replace("\r\n", "\n"))
+            } else {
+                std::borrow::Cow::Borrowed(argument.as_str())
+            };
+            for (index, line) in text.split('\n').enumerate() {
+                if index > 0 {
+                    output.push('\n');
+                    if ctx.config().use_tabchars {
+                        output.push(LITERAL_LINE_MARKER);
+                    }
+                }
+                output.push_str(line);
+            }
         }
 
         // If the next argument is an inline comment, try to keep it attached.
-        let mut consumed = first_real_idx + 1;
+        let mut consumed = first_args_len;
         if consumed < first_section.arguments.len()
             && can_attach_argument_comment(first_section.arguments[consumed], ctx.config())
         {
             let comment = first_section.arguments[consumed].as_str();
-            let line_so_far = base_indent.len() + name.len() + 1 + first_arg.as_str().len();
+            let first_args_width =
+                first_args.iter().map(|a| a.as_str().len()).sum::<usize>() + first_args.len() - 1;
+            let line_so_far = base_indent.len() + name.len() + 1 + first_args_width;
             if line_so_far + 1 + comment.len() <= cmd_config.line_width() {
                 output.push(' ');
                 output.push_str(comment);
@@ -822,7 +825,7 @@ fn format_command_vertical(
         }
 
         // Remaining arguments in the first section — try to pack them on
-        // the same line as the first arg before wrapping to a new line.
+        // the same line as the first arguments before wrapping to a new line.
         // Skip inline packing if the line already ends with a comment.
         let remaining = &first_section.arguments[consumed..];
         let line_has_comment = output.lines().last().is_some_and(|l| l.contains('#'));
@@ -901,29 +904,55 @@ fn format_command_vertical(
     Ok(output)
 }
 
-/// Whether `wrap_after_first_arg` can keep the first argument of
-/// `first_section` on the command line, that is at `prefix_width` (past
+/// How many leading arguments of `first_section` the `wrap_after_first_arg`
+/// layout keeps on the command line, that is at `prefix_width` (past
 /// `name(`), without the line exceeding `line_width`.
 ///
-/// An argument which is itself wider than the budget left at `indent_width`
-/// overflows wherever it is put, so it stays on the command line: moving it
-/// down would spend a line without making anything fit.
-fn first_arg_fits_on_command_line(
+/// At most `first_args`, the count the command spec declares. Fewer are kept
+/// when an argument would not fit, and the run stops at a comment or a
+/// multiline argument, neither of which the arguments after it could follow
+/// on the same line.
+///
+/// Zero means the layout does not apply and the call is laid out with every
+/// argument below the command line. The one exception is an argument wider
+/// than the budget left at `indent_width`: it overflows wherever it is put,
+/// so it stays on the command line, because moving it down would spend a
+/// line without making anything fit.
+fn first_args_on_command_line(
     first_section: &Section<'_>,
+    first_args: usize,
     prefix_width: usize,
     indent_width: usize,
     line_width: usize,
-) -> bool {
-    let Some(first_arg) = first_section.arguments.iter().find(|a| !a.is_comment()) else {
-        return true;
-    };
-    // Only the first line of a multiline argument shares the command line.
-    let first_line_width = first_arg
-        .as_str()
-        .split('\n')
-        .next()
-        .map_or(0, |line| line.trim_end_matches('\r').chars().count());
-    prefix_width + first_line_width <= line_width || indent_width + first_line_width > line_width
+) -> usize {
+    let mut width = prefix_width;
+    let mut kept = 0;
+    for argument in first_section.arguments.iter().take(first_args) {
+        if argument.is_comment() {
+            break;
+        }
+        // Only the first line of a multiline argument shares the command
+        // line; what follows it starts at column zero.
+        let multiline = argument_has_newline(argument);
+        let first_line_width = argument
+            .as_str()
+            .split('\n')
+            .next()
+            .map_or(0, |line| line.trim_end_matches('\r').chars().count());
+        let separator = usize::from(kept > 0);
+        if width + separator + first_line_width > line_width {
+            if kept == 0 && indent_width + first_line_width > line_width {
+                return 1;
+            }
+            break;
+        }
+        width += separator + first_line_width;
+        kept += 1;
+        if multiline {
+            break;
+        }
+    }
+    kept
 }
 
 /// Write a sequence of [`Section`]s into `output`, each indented by

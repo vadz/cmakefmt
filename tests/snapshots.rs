@@ -518,6 +518,121 @@ fn wrap_after_first_arg_takes_precedence_over_long_prefix() {
     }
 }
 
+/// `list` declares `first_args: 2` so that the subcommand does not strand the
+/// list variable it acts on below the command line.
+#[test]
+fn wrap_after_first_arg_keeps_both_first_args_of_list_up() {
+    let source = "list(APPEND html_deps ${ITO33_DIR}/Docs/ito33.css ${ITO33_DIR}/Docs/docinfo.html ${ITO33_DIR}/Docs/extra.css)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        max_pargs_hwrap: 0,
+        ..Config::default()
+    };
+
+    let output = format_source(source, &config).unwrap();
+    insta::assert_snapshot!(output, @r"
+    list(APPEND html_deps
+         ${ITO33_DIR}/Docs/ito33.css
+         ${ITO33_DIR}/Docs/docinfo.html
+         ${ITO33_DIR}/Docs/extra.css)
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &output));
+    assert_eq!(format_source(&output, &config).unwrap(), output);
+
+    let indented = Config {
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        ..config
+    };
+    let output = format_source(source, &indented).unwrap();
+    insta::assert_snapshot!(output, @r"
+    list(APPEND html_deps
+      ${ITO33_DIR}/Docs/ito33.css
+      ${ITO33_DIR}/Docs/docinfo.html
+      ${ITO33_DIR}/Docs/extra.css)
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &output));
+    assert_eq!(format_source(&output, &indented).unwrap(), output);
+}
+
+/// `set` declares `pargs: "2+"`, but only the variable it assigns belongs
+/// on the command line: `first_args` defaults to one and the positional group
+/// the spec declares must not be read as one.
+#[test]
+fn wrap_after_first_arg_keeps_only_the_variable_of_set_up() {
+    let source = "set(HTML_DEPS ${ITO33_DIR}/Docs/ito33.css ${ITO33_DIR}/Docs/docinfo.html ${ITO33_DIR}/Docs/extra.css)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        max_pargs_hwrap: 0,
+        ..Config::default()
+    };
+
+    let output = format_source(source, &config).unwrap();
+    insta::assert_snapshot!(output, @r"
+    set(HTML_DEPS
+        ${ITO33_DIR}/Docs/ito33.css
+        ${ITO33_DIR}/Docs/docinfo.html
+        ${ITO33_DIR}/Docs/extra.css)
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &output));
+    assert_eq!(format_source(&output, &config).unwrap(), output);
+}
+
+/// A project can declare the `first_args` of its own commands in `[commands.*]`.
+#[test]
+fn custom_command_spec_first_args_is_honored() {
+    let source = "my_add_module(gui widgets ${ITO33_DIR}/src/frame.cpp ${ITO33_DIR}/src/panel.cpp ${ITO33_DIR}/src/dialog.cpp)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        max_pargs_hwrap: 0,
+        ..Config::default()
+    };
+    let mut registry = CommandRegistry::load().unwrap();
+    registry
+        .merge_override_str(
+            "[commands.my_add_module]\npargs = \"*\"\nfirst_args = 2\n",
+            PathBuf::from("test-first-args-spec.toml"),
+        )
+        .unwrap();
+
+    let output = format_source_with_registry(source, &config, &registry).unwrap();
+    insta::assert_snapshot!(output, @r"
+    my_add_module(gui widgets
+                  ${ITO33_DIR}/src/frame.cpp
+                  ${ITO33_DIR}/src/panel.cpp
+                  ${ITO33_DIR}/src/dialog.cpp)
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &output));
+    assert_eq!(
+        format_source_with_registry(&output, &config, &registry).unwrap(),
+        output
+    );
+}
+
+/// First arguments wider than `line_width` are not forced onto the command
+/// line: they shrink to what fits, down to the single argument the option is
+/// named after.
+#[test]
+fn wrap_after_first_arg_first_args_shrink_to_what_fits() {
+    let source = "list(APPEND html_dependencies_of_the_documentation_target_for_this_component ${ITO33_DIR}/Docs/ito33.css ${ITO33_DIR}/Docs/docinfo.html)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        max_pargs_hwrap: 0,
+        ..Config::default()
+    };
+
+    let output = format_source(source, &config).unwrap();
+    insta::assert_snapshot!(output, @r"
+    list(APPEND html_dependencies_of_the_documentation_target_for_this_component
+         ${ITO33_DIR}/Docs/ito33.css
+         ${ITO33_DIR}/Docs/docinfo.html)
+    ");
+    assert!(output
+        .lines()
+        .all(|line| line.chars().count() <= config.line_width));
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &output));
+    assert_eq!(format_source(&output, &config).unwrap(), output);
+}
+
 #[test]
 fn hanging_keyword_continuation_keeps_equal_width_tokens_separate() {
     let source = "target_sources(lib INTERFACE aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd)\n";
