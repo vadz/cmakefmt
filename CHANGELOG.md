@@ -46,6 +46,16 @@ This project follows a simple changelog discipline:
 
 ### Fixed
 
+- Keep the leading flags of a command on the command line under
+  `format.wrap_after_first_arg`, instead of starting the body with them. The
+  option only applied to a leading positional argument, so a command selecting
+  what it does with a flag — `message(FATAL_ERROR ...)`, `set_property(GLOBAL
+  APPEND ...)` — had that flag put below the command name, where it reads as
+  one of the arguments it introduces. A keyword standing on its own, such as
+  `DIRECTORY` in `set_property(DIRECTORY APPEND PROPERTY ...)`, joins them, as
+  it selects the scope rather than introducing arguments. Commands which do
+  not enable the option are unaffected.
+
 - Reserve space for the closing parenthesis when packing arguments with
   `wrap_after_first_arg`, avoiding an unnecessary standalone `)` when the
   arguments fill `line_width` exactly (#259).

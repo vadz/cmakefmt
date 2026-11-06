@@ -895,6 +895,72 @@ fn format_command_vertical(
         return Ok(output);
     }
 
+    // A command whose first section is a flag has no leading positional
+    // argument for the layout above to keep up, so the flag that selects what
+    // the command does — `message(FATAL_ERROR ...)`, `set_property(GLOBAL ...)`
+    // — would start the body instead of the command line. Keep the leading run
+    // of flags on the command line in that case.
+    let flag_run = if wrap_after_first_arg && !first_is_positional {
+        leading_headers_on_command_line(
+            sections,
+            base_indent.chars().count() + name.chars().count() + 1,
+            cmd_config.line_width(),
+        )
+    } else {
+        0
+    };
+
+    if flag_run > 0 {
+        let continuation_indent = match ctx.wrap_after_first_arg_align {
+            crate::config::WrapAfterFirstArgAlign::DefaultIndent => indent.clone(),
+            crate::config::WrapAfterFirstArgAlign::UnderFirstArg => {
+                " ".repeat(base_indent.len() + name.len() + 1)
+            }
+        };
+        let kw_nested = format!("{continuation_indent}{}", cmd_config.indent_str());
+
+        output.push('(');
+        for (position, section) in sections[..flag_run].iter().enumerate() {
+            if position > 0 {
+                output.push(' ');
+            }
+            output.push_str(&apply_case(
+                cmd_config.keyword_case(),
+                section.header.unwrap_or_default(),
+            ));
+        }
+        output.push('\n');
+
+        // The last flag of the run may carry the arguments of the command,
+        // which continue below it as the arguments of any other section do.
+        let trailing = &sections[flag_run - 1].arguments;
+        if !trailing.is_empty() {
+            if trailing.len() > cmd_config.max_pargs_hwrap() {
+                write_vertical_arguments(
+                    &mut output,
+                    trailing,
+                    &continuation_indent,
+                    ctx.config(),
+                    ctx.patterns,
+                );
+            } else {
+                write_packed_arguments(&mut output, trailing, &continuation_indent, ctx);
+            }
+        }
+
+        write_sections(
+            &mut output,
+            &sections[flag_run..],
+            form,
+            ctx,
+            &continuation_indent,
+            &kw_nested,
+        );
+
+        close_command_output(&mut output, cmd_config, &base_indent, &name);
+        return Ok(output);
+    }
+
     output.push_str("(\n");
 
     write_sections(&mut output, sections, form, ctx, &indent, &nested_indent);
@@ -949,6 +1015,50 @@ fn first_args_on_command_line(
         width += separator + first_line_width;
         kept += 1;
         if multiline {
+            break;
+        }
+    }
+    kept
+}
+
+/// How many of the leading sections the `wrap_after_first_arg` layout keeps
+/// on the command line, that is at `prefix_width` (past `name(`), without the
+/// line exceeding `line_width`.
+///
+/// These are the headers which say what the command does rather than
+/// introduce arguments: its flags, and the keywords standing on their own.
+/// The run stops at the first keyword with arguments of its own, which it
+/// belongs with, and after the first flag carrying arguments, which continue
+/// below it. Zero means the call starts with a keyword and its arguments, or
+/// that not even the first header fits, and the command line stays empty.
+fn leading_headers_on_command_line(
+    sections: &[Section<'_>],
+    prefix_width: usize,
+    line_width: usize,
+) -> usize {
+    let mut width = prefix_width;
+    let mut kept = 0;
+    for section in sections {
+        let Some(header) = section.header else {
+            break;
+        };
+        let is_flag = section.header_kind == Some(HeaderKind::Flag);
+        // A keyword introduces the arguments below it and has to stay with
+        // them, so only one standing on its own — `DIRECTORY` in
+        // `set_property(DIRECTORY APPEND PROPERTY ...)`, which selects the
+        // scope exactly as a flag would — joins the run.
+        if !is_flag && !section.arguments.is_empty() {
+            break;
+        }
+        let separator = usize::from(kept > 0);
+        if width + separator + header.chars().count() > line_width {
+            break;
+        }
+        width += separator + header.chars().count();
+        kept += 1;
+        // The arguments a flag carries are the arguments of the command, and
+        // they continue below it; nothing else can share the command line.
+        if !section.arguments.is_empty() {
             break;
         }
     }

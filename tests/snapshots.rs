@@ -4330,3 +4330,107 @@ fn execute_process_command_echo_and_encoding_take_a_value() {
         formatted
     );
 }
+
+#[test]
+fn wrap_after_first_arg_keeps_a_leading_flag_on_the_command_line() {
+    let source = "message(FATAL_ERROR \"a message which is much too long to fit on the command line at all\")\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r#"
+    message(FATAL_ERROR
+      "a message which is much too long to fit on the command line at all")
+    "#);
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+
+    // The flag belongs to the command line only when the option asks for it.
+    let off = format_source(source, &Config::default()).unwrap();
+    insta::assert_snapshot!(off, @r#"
+    message(
+      FATAL_ERROR
+        "a message which is much too long to fit on the command line at all")
+    "#);
+}
+
+#[test]
+fn wrap_after_first_arg_keeps_a_run_of_leading_flags_on_the_command_line() {
+    let source =
+        "set_property(GLOBAL APPEND PROPERTY ITO33_PRODUCT_DEFINE_FILES ${a} ${b} ${c} ${d})\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    set_property(GLOBAL APPEND
+      PROPERTY ITO33_PRODUCT_DEFINE_FILES ${a} ${b} ${c} ${d})
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn wrap_after_first_arg_leaves_a_leading_flag_down_when_it_does_not_fit() {
+    let source = "message(FATAL_ERROR \"short\")\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        line_width: 15,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r#"
+    message(
+      FATAL_ERROR
+        "short")
+    "#);
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn wrap_after_first_arg_keeps_a_standalone_keyword_on_the_command_line() {
+    let source =
+        "set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${node_json_file})\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    // DIRECTORY selects the scope exactly as the APPEND flag modifies the
+    // operation, but PROPERTY introduces the arguments and stays with them.
+    insta::assert_snapshot!(formatted, @r"
+    set_property(DIRECTORY APPEND
+      PROPERTY CMAKE_CONFIGURE_DEPENDS ${node_json_file})
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+
+    // A keyword which does carry a value belongs with it and stays below.
+    let with_value =
+        "set_property(DIRECTORY ../elsewhere APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${a} ${b})\n";
+    insta::assert_snapshot!(format_source(with_value, &config).unwrap(), @r"
+    set_property(
+      DIRECTORY ../elsewhere
+      APPEND
+      PROPERTY CMAKE_CONFIGURE_DEPENDS ${a} ${b})
+    ");
+}

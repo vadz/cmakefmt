@@ -409,6 +409,19 @@ format:
   wrap_after_first_arg: true
 ```
 
+A command whose first argument is not a positional one, such as
+`message(FATAL_ERROR ...)` or `set_property(DIRECTORY APPEND ...)`, keeps its
+leading flags on the command line instead, together with any keyword standing
+on its own, which selects what the command does exactly as a flag would. The
+run stops at the first keyword carrying arguments, which it belongs with, and
+after the first flag carrying arguments, which continue below it:
+
+```cmake
+# wrap_after_first_arg: true
+message(FATAL_ERROR
+        "a message too long to fit on the command line with its mode")
+```
+
 When enabled globally, all commands that wrap will keep their first argument
 attached:
 
