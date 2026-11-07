@@ -4434,3 +4434,38 @@ fn wrap_after_first_arg_keeps_a_standalone_keyword_on_the_command_line() {
       PROPERTY CMAKE_CONFIGURE_DEPENDS ${a} ${b})
     ");
 }
+
+#[test]
+fn find_command_search_path_options_are_not_swallowed_by_paths() {
+    let source = "find_program(node_exe NAMES node PATHS ${ITO33_NODE_DIR}/bin ${ITO33_NODE_DIR} NO_DEFAULT_PATH NO_CACHE REQUIRED)\n";
+
+    let formatted = format_source(source, &Config::default()).unwrap();
+
+    // NO_DEFAULT_PATH ends the PATHS list rather than reading as a path.
+    insta::assert_snapshot!(formatted, @r"
+    find_program(
+      node_exe
+      NAMES node
+      PATHS ${ITO33_NODE_DIR}/bin ${ITO33_NODE_DIR}
+      NO_DEFAULT_PATH
+      NO_CACHE
+      REQUIRED)
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(
+        format_source(&formatted, &Config::default()).unwrap(),
+        formatted
+    );
+
+    // The keywords of the full signature are recognised as well.
+    let full = "find_library(ssl_lib NAMES ssl PATHS ${root}/lib PATH_SUFFIXES lib64 lib32 NO_CMAKE_SYSTEM_PATH VALIDATOR check_lib)\n";
+    insta::assert_snapshot!(format_source(full, &Config::default()).unwrap(), @r"
+    find_library(
+      ssl_lib
+      NAMES ssl
+      PATHS ${root}/lib
+      PATH_SUFFIXES lib64 lib32
+      NO_CMAKE_SYSTEM_PATH
+      VALIDATOR check_lib)
+    ");
+}

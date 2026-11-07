@@ -305,8 +305,19 @@ commands:
   find_file:
     pargs: "1+"
     flags:
+      - NAMES_PER_DIR
       - NO_CACHE
       - REQUIRED
+      - NO_DEFAULT_PATH
+      - NO_PACKAGE_ROOT_PATH
+      - NO_CMAKE_PATH
+      - NO_CMAKE_ENVIRONMENT_PATH
+      - NO_SYSTEM_ENVIRONMENT_PATH
+      - NO_CMAKE_SYSTEM_PATH
+      - NO_CMAKE_INSTALL_PREFIX
+      - CMAKE_FIND_ROOT_PATH_BOTH
+      - ONLY_CMAKE_FIND_ROOT_PATH
+      - NO_CMAKE_FIND_ROOT_PATH
     kwargs:
       DOC:
         nargs: 1
@@ -316,11 +327,28 @@ commands:
         nargs: "+"
       PATHS:
         nargs: "*"
+      PATH_SUFFIXES:
+        nargs: "*"
+      REGISTRY_VIEW:
+        nargs: 1
+      VALIDATOR:
+        nargs: 1
   find_library:
     pargs: "1+"
     flags:
+      - NAMES_PER_DIR
       - NO_CACHE
       - REQUIRED
+      - NO_DEFAULT_PATH
+      - NO_PACKAGE_ROOT_PATH
+      - NO_CMAKE_PATH
+      - NO_CMAKE_ENVIRONMENT_PATH
+      - NO_SYSTEM_ENVIRONMENT_PATH
+      - NO_CMAKE_SYSTEM_PATH
+      - NO_CMAKE_INSTALL_PREFIX
+      - CMAKE_FIND_ROOT_PATH_BOTH
+      - ONLY_CMAKE_FIND_ROOT_PATH
+      - NO_CMAKE_FIND_ROOT_PATH
     kwargs:
       DOC:
         nargs: 1
@@ -330,11 +358,28 @@ commands:
         nargs: "+"
       PATHS:
         nargs: "*"
+      PATH_SUFFIXES:
+        nargs: "*"
+      REGISTRY_VIEW:
+        nargs: 1
+      VALIDATOR:
+        nargs: 1
   find_path:
     pargs: "1+"
     flags:
+      - NAMES_PER_DIR
       - NO_CACHE
       - REQUIRED
+      - NO_DEFAULT_PATH
+      - NO_PACKAGE_ROOT_PATH
+      - NO_CMAKE_PATH
+      - NO_CMAKE_ENVIRONMENT_PATH
+      - NO_SYSTEM_ENVIRONMENT_PATH
+      - NO_CMAKE_SYSTEM_PATH
+      - NO_CMAKE_INSTALL_PREFIX
+      - CMAKE_FIND_ROOT_PATH_BOTH
+      - ONLY_CMAKE_FIND_ROOT_PATH
+      - NO_CMAKE_FIND_ROOT_PATH
     kwargs:
       DOC:
         nargs: 1
@@ -344,11 +389,28 @@ commands:
         nargs: "+"
       PATHS:
         nargs: "*"
+      PATH_SUFFIXES:
+        nargs: "*"
+      REGISTRY_VIEW:
+        nargs: 1
+      VALIDATOR:
+        nargs: 1
   find_program:
     pargs: "1+"
     flags:
+      - NAMES_PER_DIR
       - NO_CACHE
       - REQUIRED
+      - NO_DEFAULT_PATH
+      - NO_PACKAGE_ROOT_PATH
+      - NO_CMAKE_PATH
+      - NO_CMAKE_ENVIRONMENT_PATH
+      - NO_SYSTEM_ENVIRONMENT_PATH
+      - NO_CMAKE_SYSTEM_PATH
+      - NO_CMAKE_INSTALL_PREFIX
+      - CMAKE_FIND_ROOT_PATH_BOTH
+      - ONLY_CMAKE_FIND_ROOT_PATH
+      - NO_CMAKE_FIND_ROOT_PATH
     kwargs:
       DOC:
         nargs: 1
@@ -358,6 +420,12 @@ commands:
         nargs: "+"
       PATHS:
         nargs: "*"
+      PATH_SUFFIXES:
+        nargs: "*"
+      REGISTRY_VIEW:
+        nargs: 1
+      VALIDATOR:
+        nargs: 1
   file:
     forms:
       ARCHIVE_CREATE:

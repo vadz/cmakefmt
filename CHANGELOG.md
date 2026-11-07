@@ -46,6 +46,13 @@ This project follows a simple changelog discipline:
 
 ### Fixed
 
+- Recognize the search-path options of `find_file()`, `find_library()`,
+  `find_path()` and `find_program()`. Their specs declared only `NO_CACHE` and
+  `REQUIRED`, so `NO_DEFAULT_PATH`, the rest of the `NO_*` family, the
+  `CMAKE_FIND_ROOT_PATH` variants and `NAMES_PER_DIR` were taken for values of
+  whichever keyword preceded them, usually ending up inside the `PATHS` list.
+  `PATH_SUFFIXES`, `REGISTRY_VIEW` and `VALIDATOR` are now declared as well.
+
 - Keep the leading flags of a command on the command line under
   `format.wrap_after_first_arg`, instead of starting the body with them. The
   option only applied to a leading positional argument, so a command selecting
