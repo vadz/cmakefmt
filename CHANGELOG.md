@@ -66,6 +66,11 @@ This project follows a simple changelog discipline:
   `USE_SOURCE_PERMISSIONS` options of `configure_file()`. They were missing from
   its spec, so `FILE_PERMISSIONS` and the permissions following it were laid out
   as positional arguments, one per line once the call was wrapped.
+- Declare `CONDITION`, `TARGET`, `FILE_PERMISSIONS` and `NEWLINE_STYLE` of
+  `file(GENERATE)`, and `NEWLINE_STYLE` of `file(CONFIGURE)`, as keywords taking
+  values rather than as flags. Their values could then be taken for keywords
+  themselves: a target called `input` was read as the `INPUT` keyword and
+  upper-cased, so the call named a different target.
 - Recognize the search-path options of `find_file()`, `find_library()`,
   `find_path()` and `find_program()`. Their specs declared only `NO_CACHE` and
   `REQUIRED`, so `NO_DEFAULT_PATH`, the rest of the `NO_*` family, the

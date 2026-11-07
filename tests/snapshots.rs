@@ -4608,3 +4608,23 @@ fn configure_file_permissions_are_recognized() {
         formatted
     );
 }
+
+#[test]
+fn file_generate_target_value_is_not_taken_for_a_keyword() {
+    let source = "file(GENERATE OUTPUT \"${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/generated.h\" INPUT generated.h.in TARGET input)\n";
+
+    let formatted = format_source(source, &Config::default()).unwrap();
+
+    insta::assert_snapshot!(formatted, @r#"
+    file(
+      GENERATE
+      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/generated.h"
+      INPUT generated.h.in
+      TARGET input)
+    "#);
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(
+        format_source(&formatted, &Config::default()).unwrap(),
+        formatted
+    );
+}

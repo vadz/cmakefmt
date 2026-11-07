@@ -476,10 +476,6 @@ commands:
       GENERATE:
         pargs: 0
         flags:
-          - CONDITION
-          - TARGET
-          - NEWLINE_STYLE
-          - FILE_PERMISSIONS
           - USE_SOURCE_PERMISSIONS
           - NO_SOURCE_PERMISSIONS
         kwargs:
@@ -489,16 +485,25 @@ commands:
             nargs: 1
           CONTENT:
             nargs: 1
+          CONDITION:
+            nargs: 1
+          TARGET:
+            nargs: 1
+          FILE_PERMISSIONS:
+            nargs: "+"
+          NEWLINE_STYLE:
+            nargs: 1
       CONFIGURE:
         pargs: 0
         flags:
           - "@ONLY"
           - ESCAPE_QUOTES
-          - NEWLINE_STYLE
         kwargs:
           OUTPUT:
             nargs: 1
           CONTENT:
+            nargs: 1
+          NEWLINE_STYLE:
             nargs: 1
       READ:
         pargs: 2
