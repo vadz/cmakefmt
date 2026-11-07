@@ -4590,3 +4590,21 @@ fn always_wrap_closes_a_call_holding_only_its_first_args() {
     assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
     assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
 }
+
+#[test]
+fn configure_file_permissions_are_recognized() {
+    let source = "configure_file(config.h.in config.h FILE_PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)\n";
+
+    let formatted = format_source(source, &Config::default()).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    configure_file(
+      config.h.in config.h
+      FILE_PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(
+        format_source(&formatted, &Config::default()).unwrap(),
+        formatted
+    );
+}

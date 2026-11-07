@@ -81,10 +81,14 @@ commands:
   configure_file:
     pargs: 2
     flags:
+      - NO_SOURCE_PERMISSIONS
+      - USE_SOURCE_PERMISSIONS
       - COPYONLY
       - ESCAPE_QUOTES
       - "@ONLY"
     kwargs:
+      FILE_PERMISSIONS:
+        nargs: "+"
       NEWLINE_STYLE:
         nargs: 1
   add_executable:
