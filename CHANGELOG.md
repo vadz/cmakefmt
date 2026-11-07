@@ -46,6 +46,12 @@ This project follows a simple changelog discipline:
 
 ### Fixed
 
+- Close a call whose whole content is the arguments `first_args` keeps on the
+  command line, instead of leaving a line holding only `)`. A command listed
+  in `format.always_wrap` is laid out vertically however short it is, so one
+  called with no more arguments than its first — `add_subdirectory(<dir>)`,
+  with the binary directory left out — had nothing to put below the command
+  line and `format.dangle_parens` wrote the closing parenthesis on its own.
 - Do wrap the arguments of a command listed in `format.always_wrap` when
   `format.wrap_after_first_arg` is set too. Previously, the command could
   stay unwrapped if all its arguments fit on the same line.

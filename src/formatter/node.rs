@@ -833,6 +833,21 @@ fn format_command_vertical(
         let remaining = &first_section.arguments[consumed..];
         let line_has_comment = output.lines().last().is_some_and(|l| l.contains('#'));
 
+        // The first arguments are the whole of the call: the vertical layout
+        // has nothing to put below them, so close it here instead of leaving a
+        // line holding only the closing parenthesis. A command listed in
+        // always_wrap gets here whenever it is called with no more arguments
+        // than first_args keeps on the command line.
+        if remaining.is_empty()
+            && sections.len() == 1
+            && !line_has_comment
+            && !first_args.iter().any(|a| argument_has_newline(a))
+            && output.lines().last().map_or(0, |l| l.chars().count()) < cmd_config.line_width()
+        {
+            output.push(')');
+            return Ok(output);
+        }
+
         if !remaining.is_empty() {
             let line_so_far = output.lines().last().map_or(0, |l| l.len());
             let mut inline_candidate = String::new();

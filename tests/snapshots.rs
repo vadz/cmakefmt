@@ -4570,3 +4570,23 @@ fn a_call_which_only_overflowed_still_packs_after_the_first_args() {
     assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
     assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
 }
+
+#[test]
+fn always_wrap_closes_a_call_holding_only_its_first_args() {
+    let source = "add_subdirectory(${3RDPARTY_DIR}/simplecpp)\n";
+    let config = Config {
+        always_wrap: vec!["add_subdirectory".to_owned()],
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 0,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @"add_subdirectory(${3RDPARTY_DIR}/simplecpp)");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
