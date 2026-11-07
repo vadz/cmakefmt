@@ -379,6 +379,10 @@ Commands in this list skip the inline and hanging-wrap layout attempts and go
 directly to vertical layout. This is also configurable per-command via
 `layout.always_wrap` in a custom command spec under `commands:`.
 
+Under [`wrap_after_first_arg`](#wrap_after_first_arg) the arguments it keeps
+up still stay on the command line, but the arguments following them are wrapped
+on the lines below instead of being fitted into the same line.
+
 ### `require_valid_layout`
 
 When `true`, return an error if any formatted output line exceeds `line_width`.

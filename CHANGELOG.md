@@ -46,6 +46,9 @@ This project follows a simple changelog discipline:
 
 ### Fixed
 
+- Do wrap the arguments of a command listed in `format.always_wrap` when
+  `format.wrap_after_first_arg` is set too. Previously, the command could
+  stay unwrapped if all its arguments fit on the same line.
 - Add the missing `file()` forms for `COPY`, `INSTALL`, `DOWNLOAD`, `UPLOAD`,
   `GLOB` and `GLOB_RECURSE`. Their keywords fell through to the fallback form
   and were laid out as positional arguments, so `DESTINATION` was separated

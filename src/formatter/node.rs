@@ -163,6 +163,7 @@ pub(crate) fn format_command(
             &ctx,
             block_depth,
             wrap_after_first_arg,
+            true,
         )?
     } else if let Some(inline) = try_format_inline(
         command,
@@ -222,6 +223,7 @@ pub(crate) fn format_command(
             &ctx,
             block_depth,
             wrap_after_first_arg,
+            false,
         )?
     };
 
@@ -740,6 +742,7 @@ fn format_command_vertical(
     ctx: &WriteCtx<'_>,
     block_depth: usize,
     wrap_after_first_arg: bool,
+    force_vertical: bool,
 ) -> Result<String> {
     let cmd_config = ctx.cmd_config;
     let base_indent = cmd_config.indent_str().repeat(block_depth);
@@ -833,7 +836,11 @@ fn format_command_vertical(
         if !remaining.is_empty() {
             let line_so_far = output.lines().last().map_or(0, |l| l.len());
             let mut inline_candidate = String::new();
-            let mut fits_inline = !line_has_comment;
+            // Packing them onto the command line is a fallback for a call which
+            // simply did not fit; a command listed in always_wrap asked for the
+            // vertical layout itself, and filling its first line is what it is
+            // meant to prevent.
+            let mut fits_inline = !line_has_comment && !force_vertical;
             // If this is the final section, the closing paren must fit too.
             // Otherwise a full argument line leaves only `)` to wrap.
             let closing_paren_width =

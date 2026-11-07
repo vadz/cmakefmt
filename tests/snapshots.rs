@@ -4518,3 +4518,55 @@ fn file_glob_keeps_the_variable_with_the_subcommand() {
     assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
     assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
 }
+
+#[test]
+fn always_wrap_wraps_the_arguments_following_the_first_arg() {
+    let source = "set_sources(plugin a.cpp b.cpp c.cpp)\n";
+    let config = Config {
+        always_wrap: vec!["set_sources".to_owned()],
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 0,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    set_sources(plugin
+      a.cpp
+      b.cpp
+      c.cpp
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn a_call_which_only_overflowed_still_packs_after_the_first_args() {
+    let source = "cmake_path(RELATIVE_PATH path BASE_DIRECTORY ${CMAKE_BINARY_DIR} OUTPUT_VARIABLE relative)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 0,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    cmake_path(RELATIVE_PATH path
+      BASE_DIRECTORY
+        ${CMAKE_BINARY_DIR}
+      OUTPUT_VARIABLE
+        relative
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
