@@ -4469,3 +4469,52 @@ fn find_command_search_path_options_are_not_swallowed_by_paths() {
       VALIDATOR check_lib)
     ");
 }
+
+#[test]
+fn file_copy_and_download_keywords_are_recognized() {
+    let source = "file(COPY ${sources} DESTINATION \"${output_directory}/bin\" FILES_MATCHING PATTERN \"*.dll\")\nfile(DOWNLOAD ${url} ${archive}.part EXPECTED_HASH SHA256=${sha256} TLS_VERIFY ON STATUS st)\n";
+
+    let formatted = format_source(source, &Config::default()).unwrap();
+
+    insta::assert_snapshot!(formatted, @r#"
+    file(
+      COPY ${sources}
+      DESTINATION "${output_directory}/bin"
+      FILES_MATCHING PATTERN "*.dll")
+    file(
+      DOWNLOAD ${url} ${archive}.part
+      EXPECTED_HASH SHA256=${sha256}
+      TLS_VERIFY ON
+      STATUS st)
+    "#);
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(
+        format_source(&formatted, &Config::default()).unwrap(),
+        formatted
+    );
+}
+
+#[test]
+fn file_glob_keeps_the_variable_with_the_subcommand() {
+    let source = "file(GLOB binaries \"${BIN_DIR}/*.dll\" \"${BIN_DIR}/*.exe\" \"${BIN_DIR}/python/*.pyd\")\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 0,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r#"
+    file(GLOB binaries
+      "${BIN_DIR}/*.dll"
+      "${BIN_DIR}/*.exe"
+      "${BIN_DIR}/python/*.pyd"
+    )
+    "#);
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}

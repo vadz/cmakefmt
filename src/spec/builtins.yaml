@@ -509,6 +509,80 @@ commands:
         pargs: "2+"
       APPEND:
         pargs: "2+"
+      COPY: &file_copy
+        pargs: "+"
+        flags:
+          - EXCLUDE
+          - FOLLOW_SYMLINK_CHAIN
+          - NO_SOURCE_PERMISSIONS
+          - USE_SOURCE_PERMISSIONS
+        kwargs:
+          DESTINATION:
+            nargs: 1
+          DIRECTORY_PERMISSIONS:
+            nargs: "+"
+          FILE_PERMISSIONS:
+            nargs: "+"
+          PATTERN:
+            nargs: 1
+          REGEX:
+            nargs: 1
+          FILES_MATCHING:
+            nargs: "*"
+            kwargs:
+              EXCLUDE:
+                nargs: 0
+              PATTERN:
+                nargs: 1
+              REGEX:
+                nargs: 1
+      INSTALL: *file_copy
+      DOWNLOAD: &file_transfer
+        pargs: 2
+        first_args: 3
+        flags:
+          - SHOW_PROGRESS
+        kwargs:
+          EXPECTED_HASH:
+            nargs: 1
+          EXPECTED_MD5:
+            nargs: 1
+          HTTPHEADER:
+            nargs: 1
+          INACTIVITY_TIMEOUT:
+            nargs: 1
+          LOG:
+            nargs: 1
+          NETRC:
+            nargs: 1
+          NETRC_FILE:
+            nargs: 1
+          RANGE_END:
+            nargs: 1
+          RANGE_START:
+            nargs: 1
+          STATUS:
+            nargs: 1
+          TIMEOUT:
+            nargs: 1
+          TLS_CAINFO:
+            nargs: 1
+          TLS_VERIFY:
+            nargs: 1
+          TLS_VERSION:
+            nargs: 1
+          USERPWD:
+            nargs: 1
+      UPLOAD: *file_transfer
+      # The globbing expressions come after LIST_DIRECTORIES, RELATIVE and
+      # CONFIGURE_DEPENDS, and arguments following a keyword belong to its
+      # section, so declaring any of them would lay the expressions out as
+      # that keyword's values. The form exists for first_args alone, which
+      # keeps the subcommand and the variable it fills together.
+      GLOB: &file_glob
+        pargs: "+"
+        first_args: 2
+      GLOB_RECURSE: *file_glob
     fallback:
       pargs: "*"
   list:
