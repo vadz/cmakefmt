@@ -21,13 +21,19 @@ commands:
         nargs: 1
   project:
     pargs: 1
-    flags:
-      - VERSION
-      - COMPAT_VERSION
-      - SPDX_LICENSE
-      - DESCRIPTION
-      - HOMEPAGE_URL
-      - LANGUAGES
+    kwargs:
+      VERSION:
+        nargs: 1
+      COMPAT_VERSION:
+        nargs: 1
+      SPDX_LICENSE:
+        nargs: 1
+      DESCRIPTION:
+        nargs: 1
+      HOMEPAGE_URL:
+        nargs: 1
+      LANGUAGES:
+        nargs: "+"
   set:
     pargs: "2+"
     flags:

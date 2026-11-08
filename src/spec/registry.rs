@@ -803,8 +803,8 @@ mod tests {
         let CommandSpec::Single(form) = registry.get("project") else {
             panic!()
         };
-        assert!(form.flags.contains("COMPAT_VERSION"));
-        assert!(form.flags.contains("SPDX_LICENSE"));
+        assert!(form.kwargs.contains_key("COMPAT_VERSION"));
+        assert!(form.kwargs.contains_key("SPDX_LICENSE"));
     }
 
     #[test]

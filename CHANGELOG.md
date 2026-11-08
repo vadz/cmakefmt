@@ -122,6 +122,11 @@ This project follows a simple changelog discipline:
   values rather than as flags. Their values could then be taken for keywords
   themselves: a target called `input` was read as the `INPUT` keyword and
   upper-cased, so the call named a different target.
+- Declare `VERSION`, `COMPAT_VERSION`, `SPDX_LICENSE`, `DESCRIPTION`,
+  `HOMEPAGE_URL` and `LANGUAGES` of `project()` as keywords taking values
+  rather than as flags. A description which happened to be a single word
+  matching one of them, such as `languages`, was taken for that keyword and
+  upper-cased.
 - Recognize the search-path options of `find_file()`, `find_library()`,
   `find_path()` and `find_program()`. Their specs declared only `NO_CACHE` and
   `REQUIRED`, so `NO_DEFAULT_PATH`, the rest of the `NO_*` family, the

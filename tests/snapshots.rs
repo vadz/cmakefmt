@@ -4934,3 +4934,17 @@ fn a_keyword_without_a_head_still_starts_its_arguments_below_itself() {
     assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
     assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
 }
+
+#[test]
+fn project_description_is_not_taken_for_a_keyword() {
+    let source = "project(myproject VERSION 1.2.3 DESCRIPTION languages LANGUAGES C CXX)\n";
+
+    let formatted = format_source(source, &Config::default()).unwrap();
+
+    insta::assert_snapshot!(formatted, @"project(myproject VERSION 1.2.3 DESCRIPTION languages LANGUAGES C CXX)");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(
+        format_source(&formatted, &Config::default()).unwrap(),
+        formatted
+    );
+}
