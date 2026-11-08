@@ -86,6 +86,10 @@ commands:
       - SYSTEM
   configure_file:
     pargs: 2
+    # The input and the output are the two halves of one statement, and
+    # neither belongs on the command line without the other, which rarely
+    # fits there with it.
+    first_args: 0
     flags:
       - NO_SOURCE_PERMISSIONS
       - USE_SOURCE_PERMISSIONS

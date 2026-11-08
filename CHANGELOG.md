@@ -73,6 +73,10 @@ This project follows a simple changelog discipline:
   All of their arguments are items of the same list, and
   `format.wrap_after_first_arg` kept the first of them on the command line
   and the others below it, as if it were what the call acted on.
+- Declare `first_args: 0` for `configure_file()`. Its input and output are
+  the two halves of one statement, but `format.wrap_after_first_arg` kept
+  the input on the command line and put the output below it, together with
+  the options.
 
 ### Fixed
 

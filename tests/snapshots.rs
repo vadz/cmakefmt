@@ -5043,3 +5043,28 @@ fn add_compile_options_keeps_no_option_on_the_command_line() {
     assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
     assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
 }
+
+#[test]
+fn configure_file_keeps_its_input_with_its_output() {
+    let source = "configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/version.h @ONLY)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 0,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    configure_file(
+      ${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
+      ${CMAKE_CURRENT_BINARY_DIR}/include/version.h
+      @ONLY
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
