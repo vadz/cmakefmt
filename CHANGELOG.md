@@ -64,6 +64,10 @@ This project follows a simple changelog discipline:
   `string(REGEX)`, so that `format.wrap_after_first_arg` keeps the variable
   appended to, or the mode of the regex, on the command line with the
   subcommand instead of stranding it on the line below.
+- Declare `first_args: 3` for `cmake_parse_arguments(PARSE_ARGV)`, so that
+  `format.wrap_after_first_arg` keeps `PARSE_ARGV <N> <prefix>` together on
+  the command line rather than leaving the index and the prefix on lines of
+  their own.
 
 ### Fixed
 

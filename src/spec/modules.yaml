@@ -499,7 +499,16 @@ commands:
 
   # from CMake module: CMakeParseArguments
   cmake_parse_arguments:
-    pargs: "4+"
+    forms:
+      # cmake_parse_arguments(PARSE_ARGV <N> <prefix> ...) opens with a
+      # three-token prologue before the keyword lists, and
+      # wrap_after_first_arg keeping only PARSE_ARGV on the command line
+      # would split it across two lines.
+      PARSE_ARGV:
+        pargs: "4+"
+        first_args: 3
+    fallback:
+      pargs: "4+"
 
   # from CMake module: CMakePrintHelpers
   cmake_print_properties:
