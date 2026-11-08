@@ -2256,22 +2256,31 @@ commands:
     kwargs:
       DIRECTORY:
         nargs: "*"
+        first_args: "*"
       TARGET:
         nargs: "+"
+        first_args: "*"
       FILE_SET:
         nargs: "+"
+        first_args: "*"
       SOURCE:
         nargs: "+"
+        first_args: "*"
       INSTALL:
         nargs: "+"
+        first_args: "*"
       TEST:
         nargs: "+"
+        first_args: "*"
       CACHE:
         nargs: "+"
+        first_args: "*"
       TARGET_DIRECTORY:
         nargs: "+"
+        first_args: "*"
       PROPERTY:
         nargs: "+"
+        first_args: 1
         no_autosort: true
   set_source_files_properties:
     pargs: "+"

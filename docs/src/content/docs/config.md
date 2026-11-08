@@ -1208,6 +1208,72 @@ This is deliberately separate from [`pargs`](#pargs): `pargs` describes the
 whole positional run, and is unbounded for exactly the commands the layout
 exists for.
 
+A keyword can declare `first_args` too. It is for keywords whose first
+arguments are a *name* and whose remaining arguments are *values*, like
+`PROPERTY <name> <values...>` in `set_property()`. Without it, when the
+keyword's arguments don't fit on one line, all of them are wrapped the same
+way, so the name is lost among the values:
+
+```cmake
+# wrap_after_first_arg: true
+set_property(TARGET my_library APPEND
+             PROPERTY
+               LINK_DEPENDS ${PROJECT_SOURCE_DIR}/terms.map
+               ${PROJECT_SOURCE_DIR}/modelling.map
+               ${PROJECT_SOURCE_DIR}/other.map)
+```
+
+The built-in spec declares `first_args: 1` for `PROPERTY`, which keeps the
+name on the keyword's line and puts only the values below it, whether or not
+`wrap_after_first_arg` is enabled:
+
+```cmake
+# wrap_after_first_arg: true
+set_property(TARGET my_library APPEND
+             PROPERTY LINK_DEPENDS
+               ${PROJECT_SOURCE_DIR}/terms.map
+               ${PROJECT_SOURCE_DIR}/modelling.map
+               ${PROJECT_SOURCE_DIR}/other.map)
+```
+
+Under `wrap_after_first_arg`, a keyword with a count starts its own line even
+when it would fit on the command line, so that every call has the same shape
+whatever its width: what it acts on first, and then what it sets.
+
+The value `"*"` means that all of the keyword's arguments are names, with no
+values. It only matters under
+[`wrap_after_first_arg`](#wrap_after_first_arg): such a keyword stays on the
+command line with all its arguments, as a first positional argument would, if
+they fit there. `set_property()` declares it for `TARGET`, `DIRECTORY`,
+`SOURCE` and the other keywords that select what the properties are set on,
+which is why `TARGET my_library` stays on the `set_property(` line above.
+Without it, the keyword goes below the command name with all of its
+arguments, as every keyword not declaring `first_args` does:
+
+```cmake
+# wrap_after_first_arg: true
+set_property(
+  TARGET my_library
+  APPEND
+  PROPERTY LINK_DEPENDS
+    ${PROJECT_SOURCE_DIR}/terms.map ${PROJECT_SOURCE_DIR}/modelling.map
+    ${PROJECT_SOURCE_DIR}/other.map)
+```
+
+The built-in declarations for these two keywords are:
+
+```yaml
+commands:
+  set_property:
+    kwargs:
+      TARGET:
+        nargs: "+"
+        first_args: "*"
+      PROPERTY:
+        nargs: "+"
+        first_args: 1
+```
+
 #### `flags`
 
 A list of standalone keyword tokens that take no values. When `cmakefmt` sees

@@ -156,6 +156,18 @@ pub struct KwargSpec {
     /// Number of positional arguments accepted after the keyword itself.
     #[serde(default)]
     pub nargs: NArgs,
+    /// How many of this keyword's own arguments belong with it on the
+    /// command line under [`crate::Config::wrap_after_first_arg`], rather
+    /// than being the payload which continues below it: the scope
+    /// `set_property` acts on, the name of the property it sets.
+    ///
+    /// `None`, the default, keeps none of them, so the keyword joins the
+    /// command line only when it stands alone. `"*"` keeps all of them,
+    /// which is what a keyword naming a list of targets or files wants; a
+    /// count keeps that many, as `PROPERTY <name> <values…>` keeps one.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_args: Option<NArgs>,
     /// Nested keywords that may appear after this keyword.
     #[serde(default)]
     pub kwargs: IndexMap<String, KwargSpec>,
@@ -388,6 +400,11 @@ pub(crate) struct KwargSpecOverride {
     /// Mark this keyword section as exempt from autosort.
     #[serde(default)]
     pub no_autosort: bool,
+    /// Override how many of this keyword's arguments stay with it on the
+    /// command line, retaining the built-in setting when omitted. A count of
+    /// zero turns the built-in setting off.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_args: Option<NArgs>,
     /// Override terminal key/value-pair grouping, retaining the built-in
     /// setting when this field is omitted.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -499,6 +516,7 @@ impl KwargSpecOverride {
     pub(crate) fn into_full_spec(self) -> KwargSpec {
         KwargSpec {
             nargs: self.nargs.unwrap_or_default(),
+            first_args: self.first_args,
             kwargs: self
                 .kwargs
                 .into_iter()

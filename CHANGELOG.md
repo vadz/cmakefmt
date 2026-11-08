@@ -10,6 +10,15 @@ This project follows a simple changelog discipline:
 
 ### Added
 
+- Let a keyword declare, with `first_args`, how many of its own arguments
+  name what the command acts on rather than being the payload it acts with.
+  Under `format.wrap_after_first_arg` such a keyword joins the command line
+  when its head covers every argument it has — `"*"` for the `TARGET` or
+  `DIRECTORY` of a `set_property` call — and keeps that head on its own line
+  otherwise, as `PROPERTY <name> <values…>` keeps the name of the property.
+  Omitted, nothing changes: the keyword stays with all of its arguments below
+  the command name.
+
 - Keep property/value pairs together in wrapped `set_target_properties`,
   `set_directory_properties`, `set_source_files_properties`,
   `set_tests_properties`, and `set_package_properties` calls. Custom command
@@ -45,6 +54,40 @@ This project follows a simple changelog discipline:
   starts a call with an overlong line.
 
 ### Fixed
+
+- Keep the arguments a keyword's `first_args` names on its line wherever the
+  section is written, not only when the keyword reaches the command line,
+  and whether its values are listed one per line or filled below it. The
+  name of the property in a wrapped `set_property` call was put on the line
+  below the keyword, listed or filled together with the values and
+  indistinguishable from them:
+
+  ```cmake
+  set_property(SOURCE ${COMMON_DIR}/src/stacktrace.cpp APPEND
+    PROPERTY COMPILE_DEFINITIONS
+      ITO33_HAVE_CPPTRACE
+  )
+  ```
+
+  A keyword declaring no `first_args` still starts its arguments below
+  itself, and a head which does not fit on the header line is not used.
+
+- Keep the scope of a wrapped `set_property` call on the command line instead
+  of starting its body with it:
+
+  ```cmake
+  set_property(TARGET my_target
+    PROPERTY SOME_PROPERTY a_value
+  )
+  ```
+
+  `GLOBAL` and `APPEND` are flags and already stayed up, but a scope naming
+  what it applies to — `TARGET <target>`, `SOURCE <file>`, `TEST <test>` —
+  carries an argument, which stopped the leading run at once and left the
+  command line empty. `PROPERTY` still goes below: it carries what is being
+  set, and splitting it from its values gave neighbouring calls different
+  shapes according to their width. Commands which do not enable
+  `wrap_after_first_arg` are unaffected.
 
 - Close a call whose whole content is the arguments `first_args` keeps on the
   command line, instead of leaving a line holding only `)`. A command listed

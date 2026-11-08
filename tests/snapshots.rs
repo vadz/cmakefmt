@@ -1571,9 +1571,8 @@ set_property(TARGET wrapdemo PROPERTY
 
     set_property(
       TARGET wrapdemo
-      PROPERTY
-        INTERFACE_COMPILE_FEATURES cxx_std_20 cxx_constexpr cxx_lambdas
-        cxx_variadic_templates)
+      PROPERTY INTERFACE_COMPILE_FEATURES
+        cxx_std_20 cxx_constexpr cxx_lambdas cxx_variadic_templates)
     ");
 }
 
@@ -1646,9 +1645,8 @@ set_property(TARGET wrapdemo PROPERTY
 
     set_property(
       TARGET wrapdemo
-      PROPERTY
-        INTERFACE_COMPILE_FEATURES cxx_std_20 cxx_constexpr cxx_lambdas
-        cxx_variadic_templates
+      PROPERTY INTERFACE_COMPILE_FEATURES
+        cxx_std_20 cxx_constexpr cxx_lambdas cxx_variadic_templates
     )
     ");
 }
@@ -4424,13 +4422,12 @@ fn wrap_after_first_arg_keeps_a_standalone_keyword_on_the_command_line() {
     assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
     assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
 
-    // A keyword which does carry a value belongs with it and stays below.
+    // A scope keyword takes the directory it names up with it: its spec
+    // declares the whole of it as the head, so nothing is left below.
     let with_value =
         "set_property(DIRECTORY ../elsewhere APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${a} ${b})\n";
     insta::assert_snapshot!(format_source(with_value, &config).unwrap(), @r"
-    set_property(
-      DIRECTORY ../elsewhere
-      APPEND
+    set_property(DIRECTORY ../elsewhere APPEND
       PROPERTY CMAKE_CONFIGURE_DEPENDS ${a} ${b})
     ");
 }
@@ -4592,6 +4589,117 @@ fn always_wrap_closes_a_call_holding_only_its_first_args() {
 }
 
 #[test]
+fn set_property_keeps_the_scope_on_the_command_line() {
+    let source =
+        "set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${node_json_file})\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 2,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    set_property(DIRECTORY APPEND
+      PROPERTY CMAKE_CONFIGURE_DEPENDS ${node_json_file}
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn a_keyword_head_of_all_takes_the_whole_scope_up_with_it() {
+    let source =
+        "set_property(TARGET first_target second_target PROPERTY SOME_PROPERTY_NAME a_value)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 2,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    set_property(TARGET first_target second_target
+      PROPERTY SOME_PROPERTY_NAME a_value
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn the_run_stops_before_the_keyword_carrying_the_payload() {
+    // PROPERTY SOME_NAME would fit on the command line twice over, but the
+    // keyword stays with the values it introduces instead of being split
+    // from them, so that every call has the same two parts.
+    let source =
+        "set_property(GLOBAL PROPERTY SOME_NAME alpha beta gamma delta epsilon zeta eta)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 2,
+        dangle_parens: true,
+        line_width: 50,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    set_property(GLOBAL
+      PROPERTY SOME_NAME
+        alpha
+        beta
+        gamma
+        delta
+        epsilon
+        zeta
+        eta
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn a_keyword_without_a_head_still_stays_with_its_arguments() {
+    // install() declares no first_args, so DESTINATION introduces the
+    // directory below it as before.
+    let source =
+        "install(TARGETS a_library_with_a_long_name DESTINATION ${CMAKE_INSTALL_LIBDIR})\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 0,
+        dangle_parens: true,
+        line_width: 60,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    install(TARGETS a_library_with_a_long_name
+      DESTINATION
+        ${CMAKE_INSTALL_LIBDIR}
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
 fn configure_file_permissions_are_recognized() {
     let source = "configure_file(config.h.in config.h FILE_PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)\n";
 
@@ -4627,4 +4735,77 @@ fn file_generate_target_value_is_not_taken_for_a_keyword() {
         format_source(&formatted, &Config::default()).unwrap(),
         formatted
     );
+}
+
+#[test]
+fn a_keyword_head_stays_with_it_below_the_command_line_too() {
+    let source = "set_property(SOURCE ${COMMON_DIR}/src/stacktrace.cpp APPEND PROPERTY COMPILE_DEFINITIONS ITO33_HAVE_CPPTRACE)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 1,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    set_property(SOURCE ${COMMON_DIR}/src/stacktrace.cpp APPEND
+      PROPERTY COMPILE_DEFINITIONS
+        ITO33_HAVE_CPPTRACE
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+/// The head stays on the keyword's line when its values are few enough to be
+/// filled below it too, rather than being filled together with them.
+#[test]
+fn a_keyword_head_is_not_filled_with_the_values() {
+    let source = "set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/terms.i ${PROJECT_SOURCE_DIR}/modelling.i ${PROJECT_SOURCE_DIR}/other.i)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    set_property(DIRECTORY APPEND
+                 PROPERTY CMAKE_CONFIGURE_DEPENDS
+                   ${PROJECT_SOURCE_DIR}/terms.i ${PROJECT_SOURCE_DIR}/modelling.i
+                   ${PROJECT_SOURCE_DIR}/other.i)
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn a_keyword_without_a_head_still_starts_its_arguments_below_itself() {
+    let source = "target_include_directories(my_target PUBLIC dir_one dir_two dir_three)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 1,
+        dangle_parens: true,
+        line_width: 50,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    target_include_directories(my_target
+      PUBLIC
+        dir_one
+        dir_two
+        dir_three
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
 }

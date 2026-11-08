@@ -577,6 +577,9 @@ fn merge_kwarg(base: &mut KwargSpec, override_kwarg: KwargSpecOverride) {
     if let Some(nargs) = override_kwarg.nargs {
         base.nargs = nargs;
     }
+    if let Some(first_args) = override_kwarg.first_args {
+        base.first_args = Some(first_args);
+    }
 
     if let Some(command_line) = override_kwarg.command_line {
         base.command_line = command_line;

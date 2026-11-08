@@ -922,14 +922,15 @@ fn format_command_vertical(
     // the command does — `message(FATAL_ERROR ...)`, `set_property(GLOBAL ...)`
     // — would start the body instead of the command line. Keep the leading run
     // of flags on the command line in that case.
-    let flag_run = if wrap_after_first_arg && !first_is_positional {
+    let (flag_run, flag_run_arguments) = if wrap_after_first_arg && !first_is_positional {
         leading_headers_on_command_line(
             sections,
+            form,
             base_indent.chars().count() + name.chars().count() + 1,
             cmd_config.line_width(),
         )
     } else {
-        0
+        (0, 0)
     };
 
     if flag_run > 0 {
@@ -950,12 +951,23 @@ fn format_command_vertical(
                 cmd_config.keyword_case(),
                 section.header.unwrap_or_default(),
             ));
+            // Only the last section of the run can have arguments left below
+            // it: the loop above stops at the first one it cannot take whole.
+            let head = if position + 1 == flag_run {
+                flag_run_arguments
+            } else {
+                section.arguments.len()
+            };
+            for argument in &section.arguments[..head] {
+                output.push(' ');
+                output.push_str(argument.as_str());
+            }
         }
         output.push('\n');
 
-        // The last flag of the run may carry the arguments of the command,
+        // The last header of the run may carry the arguments of the command,
         // which continue below it as the arguments of any other section do.
-        let trailing = &sections[flag_run - 1].arguments;
+        let trailing = &sections[flag_run - 1].arguments[flag_run_arguments..];
         if !trailing.is_empty() {
             if trailing.len() > cmd_config.max_pargs_hwrap() {
                 write_vertical_arguments(
@@ -1043,48 +1055,146 @@ fn first_args_on_command_line(
     kept
 }
 
-/// How many of the leading sections the `wrap_after_first_arg` layout keeps
-/// on the command line, that is at `prefix_width` (past `name(`), without the
-/// line exceeding `line_width`.
-///
-/// These are the headers which say what the command does rather than
-/// introduce arguments: its flags, and the keywords standing on their own.
-/// The run stops at the first keyword with arguments of its own, which it
-/// belongs with, and after the first flag carrying arguments, which continue
-/// below it. Zero means the call starts with a keyword and its arguments, or
-/// that not even the first header fits, and the command line stays empty.
-fn leading_headers_on_command_line(
-    sections: &[Section<'_>],
-    prefix_width: usize,
+/// How many of a keyword's arguments its `first_args` covers, of the
+/// `available` ones it actually has.
+fn first_args_count(first_args: Option<&crate::spec::NArgs>, available: usize) -> usize {
+    use crate::spec::NArgs;
+    match first_args {
+        None => 0,
+        Some(NArgs::Fixed(count)) => (*count).min(available),
+        Some(NArgs::Optional) => available.min(1),
+        // A keyword naming what the command acts on takes the whole of that
+        // list up with it: the targets of set_property(TARGET a b PROPERTY …)
+        // are one scope, not a head and a value.
+        Some(NArgs::ZeroOrMore | NArgs::OneOrMore | NArgs::AtLeast(_)) => available,
+    }
+}
+
+/// How many arguments of a wrapped keyword section stay on the header line,
+/// as the keyword's `first_args` declares, given that the header itself ends
+/// at `header_width`. Zero when the spec declares none, or when they do not
+/// fit, so that the section falls back to the layout it would have had.
+fn section_head_on_header_line(
+    spec: Option<&crate::spec::KwargSpec>,
+    arguments: &[&Argument],
+    header_width: usize,
     line_width: usize,
 ) -> usize {
+    let declared = first_args_count(
+        spec.and_then(|spec| spec.first_args.as_ref()),
+        arguments.len(),
+    );
+    // Nothing sharing a line can carry a comment or span lines of its own.
+    let head = arguments[..declared]
+        .iter()
+        .position(|argument| argument.is_comment() || argument_has_newline(argument))
+        .unwrap_or(declared);
+    let width: usize = arguments[..head]
+        .iter()
+        .map(|argument| 1 + argument.as_str().chars().count())
+        .sum();
+    if header_width + width > line_width {
+        return 0;
+    }
+    head
+}
+
+/// Finish the header line of a wrapped keyword section with the first `head`
+/// of its `arguments`, as computed by [`section_head_on_header_line`], and
+/// write the rest below it: one per line when there are more than
+/// `max_pargs_hwrap` of them, and packed otherwise.
+fn write_section_after_head(
+    output: &mut String,
+    arguments: &[&Argument],
+    head: usize,
+    nested_indent: &str,
+    ctx: &WriteCtx<'_>,
+) {
+    for argument in &arguments[..head] {
+        output.push(' ');
+        output.push_str(argument.as_str());
+    }
+    output.push('\n');
+    let rest = &arguments[head..];
+    if rest.len() > ctx.cmd_config.max_pargs_hwrap() {
+        write_vertical_arguments(output, rest, nested_indent, ctx.config(), ctx.patterns);
+    } else if !rest.is_empty() {
+        write_packed_arguments(output, rest, nested_indent, ctx);
+    }
+}
+
+/// How many of the leading sections the `wrap_after_first_arg` layout keeps
+/// on the command line, that is at `prefix_width` (past `name(`), without the
+/// line exceeding `line_width`, and how many arguments of the last of them go
+/// up with it.
+///
+/// These are the headers which say what the command acts on rather than
+/// introduce the arguments it acts with: its flags, the keywords standing on
+/// their own, and the keywords whose
+/// [`crate::spec::KwargSpec::first_args`] covers every argument they have —
+/// `DIRECTORY` and `TARGET <target>` alike select the scope of a
+/// `set_property` call. The run stops before the keyword which keeps
+/// arguments below it, so that `PROPERTY <name> <values…>` is written whole
+/// under the command line rather than split across it. Zero means the call
+/// starts with such a keyword, or that not even the first header fits, and
+/// the command line stays empty.
+fn leading_headers_on_command_line(
+    sections: &[Section<'_>],
+    form: &CommandForm,
+    prefix_width: usize,
+    line_width: usize,
+) -> (usize, usize) {
     let mut width = prefix_width;
     let mut kept = 0;
+    let mut kept_arguments = 0;
     for section in sections {
         let Some(header) = section.header else {
             break;
         };
         let is_flag = section.header_kind == Some(HeaderKind::Flag);
-        // A keyword introduces the arguments below it and has to stay with
-        // them, so only one standing on its own — `DIRECTORY` in
-        // `set_property(DIRECTORY APPEND PROPERTY ...)`, which selects the
-        // scope exactly as a flag would — joins the run.
-        if !is_flag && !section.arguments.is_empty() {
+        let declared = if is_flag {
+            0
+        } else {
+            first_args_count(
+                lookup_kwarg(form, header).and_then(|spec| spec.first_args.as_ref()),
+                section.arguments.len(),
+            )
+        };
+        // Nothing written on the command line can carry a comment or span
+        // lines of its own, so the head stops short of such an argument.
+        let head = section.arguments[..declared]
+            .iter()
+            .position(|argument| argument.is_comment() || argument_has_newline(argument))
+            .unwrap_or(declared);
+        // A keyword belongs with the arguments it introduces, so it joins
+        // the run only when its head covers all of them and nothing is left
+        // below: `DIRECTORY` and `TARGET <target>` select the scope of
+        // `set_property(... PROPERTY <name> <values…>)` exactly as a flag
+        // would, while `PROPERTY` carries what is being set and stays with
+        // it, one section under the command line.
+        if !is_flag && section.arguments.len() > head {
             break;
         }
         let separator = usize::from(kept > 0);
-        if width + separator + header.chars().count() > line_width {
+        let mut candidate = width + separator + header.chars().count();
+        for argument in &section.arguments[..head] {
+            candidate += 1 + argument.as_str().chars().count();
+        }
+        if candidate > line_width {
             break;
         }
-        width += separator + header.chars().count();
+        width = candidate;
         kept += 1;
-        // The arguments a flag carries are the arguments of the command, and
-        // they continue below it; nothing else can share the command line.
-        if !section.arguments.is_empty() {
+        kept_arguments = head;
+        // The arguments a flag carries are the arguments of the command and
+        // continue below it; nothing else can share the command line then.
+        // Only a flag reaches this with arguments left: a keyword with any
+        // has already stopped the run above.
+        if section.arguments.len() > head {
             break;
         }
     }
-    kept
+    (kept, kept_arguments)
 }
 
 /// Write a sequence of [`Section`]s into `output`, each indented by
@@ -1158,8 +1268,21 @@ fn write_sections(
                     output.push('\n');
                     write_packed_arguments(output, arguments, nested_indent, ctx);
                 } else if file_set || arguments.len() > cmd_config.max_pargs_hwrap() {
+                    // The arguments the keyword's head names belong with it
+                    // wherever the section is written, not only when the
+                    // section reaches the command line: `PROPERTY` alone above
+                    // the name of the property it sets reads as if the name
+                    // were one of its values.
+                    let head = section_head_on_header_line(
+                        parent_spec,
+                        arguments,
+                        section_indent.chars().count() + header.chars().count(),
+                        ctx.line_width(),
+                    );
                     if let Some(spec) = grouped_spec {
                         write_header_line_and_group(output, arguments, spec, nested_indent, ctx);
+                    } else if head > 0 {
+                        write_section_after_head(output, arguments, head, nested_indent, ctx);
                     } else {
                         output.push('\n');
                         write_vertical_arguments(
@@ -1183,6 +1306,16 @@ fn write_sections(
                     output.push('\n');
                 } else if let Some(spec) = grouped_spec {
                     write_header_line_and_group(output, arguments, spec, nested_indent, ctx);
+                } else if let head @ 1.. = section_head_on_header_line(
+                    parent_spec,
+                    arguments,
+                    section_indent.chars().count() + header.chars().count(),
+                    ctx.line_width(),
+                ) {
+                    // Hanging or packing the section would put the head and
+                    // the values on the same lines, so that the name of the
+                    // property reads as one of them.
+                    write_section_after_head(output, arguments, head, nested_indent, ctx);
                 } else if let Some(wrapped) =
                     format_section_hanging(&header, arguments, section_indent, ctx)
                 {
