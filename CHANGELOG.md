@@ -60,6 +60,10 @@ This project follows a simple changelog discipline:
   does not apply to the command. When the first arguments are wider than
   `line_width`, only the ones that fit are kept, so the layout still never
   starts a call with an overlong line.
+- Declare `first_args: 2` for `string(APPEND)`, `string(PREPEND)` and
+  `string(REGEX)`, so that `format.wrap_after_first_arg` keeps the variable
+  appended to, or the mode of the regex, on the command line with the
+  subcommand instead of stranding it on the line below.
 
 ### Fixed
 

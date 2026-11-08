@@ -612,6 +612,18 @@ commands:
     first_args: 2
   string:
     forms:
+      # string(APPEND <var> ...) acts on the variable named second, as
+      # list(APPEND <list-var> ...) does, and REGEX is followed by its mode,
+      # so both belong on the command line when wrap_after_first_arg wraps
+      # the call. The other subcommands take a value rather than a variable
+      # there and keep the default.
+      APPEND: &string_append
+        pargs: "+"
+        first_args: 2
+      PREPEND: *string_append
+      REGEX:
+        pargs: "+"
+        first_args: 2
       JSON:
         pargs: 1
         flags:

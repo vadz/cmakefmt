@@ -4948,3 +4948,40 @@ fn project_description_is_not_taken_for_a_keyword() {
         formatted
     );
 }
+
+#[test]
+fn string_append_and_regex_keep_their_second_argument_up() {
+    let source = "string(APPEND CMAKE_CXX_FLAGS \" -fvisibility=hidden\" \" -fvisibility-inlines-hidden\" \" -fno-strict-aliasing\")\nstring(REGEX REPLACE \"^([0-9]+)\\\\.([0-9]+).*$\" \"\\\\1\" VERSION_MAJOR \"${PROJECT_VERSION_STRING}\")\nstring(REPLACE \".\" \",\" LONG_PRODUCT_VERSION_WITH_COMMAS \"${LONG_PRODUCT_VERSION_FULL_STRING}\")\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 0,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r#"
+    string(APPEND CMAKE_CXX_FLAGS
+      " -fvisibility=hidden"
+      " -fvisibility-inlines-hidden"
+      " -fno-strict-aliasing"
+    )
+    string(REGEX REPLACE
+      "^([0-9]+)\\.([0-9]+).*$"
+      "\\1"
+      VERSION_MAJOR
+      "${PROJECT_VERSION_STRING}"
+    )
+    string(REPLACE
+      "."
+      ","
+      LONG_PRODUCT_VERSION_WITH_COMMAS
+      "${LONG_PRODUCT_VERSION_FULL_STRING}"
+    )
+    "#);
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
