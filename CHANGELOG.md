@@ -10,6 +10,14 @@ This project follows a simple changelog discipline:
 
 ### Added
 
+- Keep the scope of a `target_sources` file set on its line. A keyword whose
+  spec says `joins_next`, given no arguments of its own, shares the line of
+  the section it introduces rather than standing above it, so that a wrapped
+  call reads `PUBLIC FILE_SET HEADERS` and not `PUBLIC` alone over
+  `FILE_SET HEADERS`. The built-in specs declare it for the `INTERFACE`,
+  `PRIVATE` and `PUBLIC` of `target_sources` only, and a keyword given
+  arguments of its own, or annotated with a comment, keeps the line it had.
+
 - Let a keyword declare, with `first_args`, how many of its own arguments
   name what the command acts on rather than being the payload it acts with.
   Under `format.wrap_after_first_arg` such a keyword joins the command line

@@ -267,10 +267,13 @@ commands:
             nargs: "*"
       INTERFACE:
         nargs: "*"
+        joins_next: true
       PRIVATE:
         nargs: "*"
+        joins_next: true
       PUBLIC:
         nargs: "*"
+        joins_next: true
   set_target_properties:
     pargs: "+"
     kwargs:

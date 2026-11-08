@@ -199,6 +199,12 @@ pub struct KwargSpec {
     /// lines as possible.
     #[serde(default)]
     pub command_line: bool,
+    /// When `true`, a keyword given no arguments of its own introduces the
+    /// section which follows it instead of standing above it, and shares its
+    /// line: the scope of a `target_sources` file set is written as
+    /// `PUBLIC FILE_SET HEADERS`.
+    #[serde(default)]
+    pub joins_next: bool,
 }
 
 /// One fully resolved command form.
@@ -415,6 +421,10 @@ pub(crate) struct KwargSpecOverride {
     /// setting.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command_line: Option<bool>,
+    /// Mark (or, with `false`, unmark) this keyword as one which shares the
+    /// line of the section following it when it has no arguments of its own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub joins_next: Option<bool>,
 }
 
 /// Partial override for a command form.
@@ -531,6 +541,7 @@ impl KwargSpecOverride {
             no_autosort: self.no_autosort,
             pairwise: self.pairwise.unwrap_or(false),
             command_line: self.command_line.unwrap_or_default(),
+            joins_next: self.joins_next.unwrap_or_default(),
         }
     }
 }

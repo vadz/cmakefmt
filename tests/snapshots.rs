@@ -787,8 +787,7 @@ fn target_sources_file_sets_have_nested_lists() {
     insta::assert_snapshot!(formatted, @r"
     target_sources(
         my_lib
-        INTERFACE
-        FILE_SET HEADERS
+        INTERFACE FILE_SET HEADERS
             BASE_DIRS
                 dir1
                 dir2
@@ -811,8 +810,7 @@ fn wrapped_file_set_keeps_nested_keywords_on_separate_lines() {
     insta::assert_snapshot!(formatted, @r#"
     function(f target)
         target_sources("${target}"
-            PUBLIC
-            FILE_SET HEADERS
+            PUBLIC FILE_SET HEADERS
                 BASE_DIRS "${ARG_PUBLIC_HEADER_BASE_DIR}"
                 FILES ${ARG_PUBLIC_HEADERS})
     endfunction()
@@ -834,6 +832,133 @@ fn wrapped_file_set_keeps_nested_keywords_on_separate_lines() {
         assert!(formatted.contains("FILE_SET modules\n"));
         assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
         assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    }
+}
+
+#[test]
+fn a_scope_keyword_shares_the_line_of_the_file_set_it_introduces() {
+    let source = "target_sources(my_lib PRIVATE src/a.cpp PUBLIC FILE_SET HEADERS BASE_DIRS include FILES include/a.h)\n";
+    let config = file_set_scope_config();
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    target_sources(my_lib
+      PRIVATE
+        src/a.cpp
+      PUBLIC FILE_SET HEADERS
+        BASE_DIRS
+          include
+        FILES
+          include/a.h
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn a_scope_keyword_with_sources_of_its_own_keeps_them_below_itself() {
+    let source = "target_sources(my_lib PUBLIC src/a.cpp FILE_SET HEADERS FILES include/a.h)\n";
+    let config = file_set_scope_config();
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    target_sources(my_lib
+      PUBLIC
+        src/a.cpp
+      FILE_SET HEADERS
+        FILES
+          include/a.h
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn a_scope_keyword_which_would_overflow_the_line_stays_above_it() {
+    let source = "target_sources(my_lib PRIVATE src/a.cpp PUBLIC FILE_SET HEADERS BASE_DIRS include FILES include/a.h)\n";
+    let config = Config {
+        line_width: 24,
+        ..file_set_scope_config()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    target_sources(my_lib
+      PRIVATE
+        src/a.cpp
+      PUBLIC
+      FILE_SET HEADERS
+        BASE_DIRS
+          include
+        FILES
+          include/a.h
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn a_comment_keeps_the_scope_keyword_above_the_file_set() {
+    let source = "target_sources(my_lib\n  PUBLIC\n  # the public headers\n  FILE_SET HEADERS FILES include/a.h\n)\n";
+    let config = file_set_scope_config();
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    target_sources(my_lib
+      PUBLIC
+        # the public headers
+      FILE_SET HEADERS
+        FILES
+          include/a.h
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+#[test]
+fn a_keyword_introducing_nothing_keeps_a_line_of_its_own() {
+    let source = "install(TARGETS my_lib RUNTIME LIBRARY DESTINATION lib)\n";
+    let config = Config {
+        always_wrap: vec!["install".into()],
+        ..file_set_scope_config()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    // An artifact kind of its own is not the scope of the one below it, so
+    // the two stay apart: `DESTINATION lib` is where the library goes and
+    // says nothing about where the runtime does.
+    insta::assert_snapshot!(formatted, @r"
+    install(TARGETS
+      my_lib
+      RUNTIME
+      LIBRARY
+        DESTINATION lib
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}
+
+/// The layout of a wrapped `target_sources` call: one argument per line, so
+/// that the scope keyword introducing a file set has a line to share.
+fn file_set_scope_config() -> Config {
+    Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        always_wrap: vec!["target_sources".into()],
+        max_pargs_hwrap: 0,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
     }
 }
 

@@ -1210,6 +1210,10 @@ fn write_sections(
     nested_indent: &str,
 ) {
     let cmd_config = ctx.cmd_config;
+    // A keyword which introduces the section below it rather than standing
+    // above it waits here until that section's header line is written, so
+    // that the two share it.
+    let mut pending_header: Option<String> = None;
     for (index, section) in sections.iter().enumerate() {
         match section.header {
             None => {
@@ -1239,7 +1243,34 @@ fn write_sections(
                     } else {
                         (&section.arguments[..], &[][..])
                     };
+                let grouped_spec = parent_spec.filter(|s| !s.kwargs.is_empty());
+                // File-set subgroups stay distinct even when the entire section fits.
+                let file_set = ctx.command_name.eq_ignore_ascii_case("target_sources")
+                    && header_raw.eq_ignore_ascii_case("FILE_SET")
+                    && grouped_spec.is_some();
+                let header = join_pending_header(
+                    output,
+                    pending_header.take(),
+                    header,
+                    section_indent,
+                    grouped_header_line_arguments(grouped_spec, arguments),
+                    ctx.line_width(),
+                );
                 if arguments.is_empty() {
+                    // The scope of a `target_sources` file set says what the
+                    // keyword below it applies to and is read with it, so it
+                    // goes on that keyword's line: `PUBLIC FILE_SET HEADERS`.
+                    // A comment of its own keeps it where it was, above the
+                    // comment it is annotated with.
+                    let joins_next = parent_spec.is_some_and(|spec| spec.joins_next)
+                        && next_section_comments.is_empty()
+                        && sections
+                            .get(index + 1)
+                            .is_some_and(|next| next.header.is_some());
+                    if joins_next {
+                        pending_header = Some(header);
+                        continue;
+                    }
                     output.push_str(section_indent);
                     output.push_str(&header);
                     output.push('\n');
@@ -1254,11 +1285,6 @@ fn write_sections(
                     write_paired_arguments(output, &section.arguments, nested_indent, ctx);
                     continue;
                 }
-                let grouped_spec = parent_spec.filter(|s| !s.kwargs.is_empty());
-                // File-set subgroups stay distinct even when the entire section fits.
-                let file_set = ctx.command_name.eq_ignore_ascii_case("target_sources")
-                    && header_raw.eq_ignore_ascii_case("FILE_SET")
-                    && grouped_spec.is_some();
                 if command_line {
                     // A command line is one unit, not a list: never one
                     // argument per line, and never on the header line either,
@@ -1330,6 +1356,52 @@ fn write_sections(
             }
         }
     }
+}
+
+/// Prepend the headers waiting to share the line of `header` to it, writing
+/// them on a line of their own instead when the line they would share does
+/// not fit within `line_width`. `arguments_width` is what the arguments
+/// written on that line add to it.
+fn join_pending_header(
+    output: &mut String,
+    pending: Option<String>,
+    header: String,
+    section_indent: &str,
+    arguments_width: usize,
+    line_width: usize,
+) -> String {
+    let Some(prefix) = pending else {
+        return header;
+    };
+    let joined = format!("{prefix} {header}");
+    let width = section_indent.chars().count() + joined.chars().count() + arguments_width;
+    if width <= line_width {
+        return joined;
+    }
+    output.push_str(section_indent);
+    output.push_str(&prefix);
+    output.push('\n');
+    header
+}
+
+/// Width the arguments a grouped section writes on its header line add to it.
+///
+/// The grouped layout puts them there without measuring the line, so joining
+/// a header to it has to; every other layout measures its own line and falls
+/// back by itself when what it holds does not fit.
+fn grouped_header_line_arguments(
+    grouped_spec: Option<&crate::spec::KwargSpec>,
+    arguments: &[&Argument],
+) -> usize {
+    let Some(spec) = grouped_spec else {
+        return 0;
+    };
+    arguments
+        .iter()
+        .take(header_positional_count(spec))
+        .take_while(|argument| !argument.is_comment())
+        .map(|argument| 1 + argument.as_str().chars().count())
+        .sum()
 }
 
 /// Split the run of standalone comments ending `arguments` off the rest.

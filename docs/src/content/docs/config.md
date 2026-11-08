@@ -131,6 +131,7 @@ cmakefmt config dump --format toml > .cmakefmt.toml
     - [`flags`](#flags)
     - [`kwargs`](#kwargs)
     - [`command_line`](#command_line)
+    - [`joins_next`](#joins_next)
     - [`layout`](#layout)
   - [Discriminated commands](#discriminated-commands)
   - [A larger example](#a-larger-example)
@@ -1417,6 +1418,42 @@ commands:
       COMMAND:
         command_line: false
 ```
+
+#### `joins_next`
+
+Set `joins_next: true` on a keyword which says what the section below it
+applies to rather than taking values of its own. Given no arguments, such a
+keyword shares the line of the section following it instead of standing above
+it, so that the two are read together:
+
+```cmake
+target_sources(my_lib
+  PRIVATE
+    src/a.cpp
+  PUBLIC FILE_SET HEADERS
+    BASE_DIRS
+      include
+    FILES
+      include/a.h
+)
+```
+
+The built-in specs carry it on the scope keywords of `target_sources`, which
+is where CMake puts a keyword in front of another one like this:
+
+```yaml
+commands:
+  target_sources:
+    kwargs:
+      PUBLIC:
+        nargs: "*"
+        joins_next: true
+```
+
+A keyword given arguments of its own keeps them and the next section starts
+below them as before, as it does for a keyword whose own line carries a
+comment, or when the joined line would not fit within `line_width`. Set
+`joins_next: false` to turn a built-in setting off.
 
 #### `layout`
 

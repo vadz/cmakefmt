@@ -585,6 +585,10 @@ fn merge_kwarg(base: &mut KwargSpec, override_kwarg: KwargSpecOverride) {
         base.command_line = command_line;
     }
 
+    if let Some(joins_next) = override_kwarg.joins_next {
+        base.joins_next = joins_next;
+    }
+
     merge_flags(&mut base.flags, override_kwarg.flags);
 
     for (name, nested_override) in override_kwarg.kwargs {
@@ -730,6 +734,25 @@ mod tests {
         // The rest of the built-in spec is untouched by the partial override.
         assert_eq!(form.kwargs["COMMAND"].nargs, NArgs::OneOrMore);
         assert!(form.kwargs.contains_key("OUTPUT"));
+    }
+
+    #[test]
+    fn joins_next_override_merges_into_builtin() {
+        let mut registry = CommandRegistry::load().unwrap();
+        let form = registry.get("target_sources").form_for(None);
+        assert!(form.kwargs["PUBLIC"].joins_next);
+        assert!(!form.kwargs["FILE_SET"].joins_next);
+
+        registry
+            .merge_yaml_overrides(
+                "commands:\n  target_sources:\n    kwargs:\n      PUBLIC:\n        joins_next: false\n",
+            )
+            .unwrap();
+        let form = registry.get("target_sources").form_for(None);
+        assert!(!form.kwargs["PUBLIC"].joins_next);
+        // The rest of the built-in spec is untouched by the partial override.
+        assert!(form.kwargs["PRIVATE"].joins_next);
+        assert_eq!(form.kwargs["PUBLIC"].nargs, NArgs::ZeroOrMore);
     }
 
     #[test]
