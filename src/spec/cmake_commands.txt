@@ -36,6 +36,7 @@ add_subdirectory
 add_test
 android_add_test_data
 aux_source_directory
+bison_target
 block
 break
 build_command
@@ -169,6 +170,7 @@ find_path
 find_program
 fixup_bundle
 fixup_bundle_item
+flex_target
 fltk_wrap_ui
 foreach
 fortrancinterface_header

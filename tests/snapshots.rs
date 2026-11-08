@@ -5068,3 +5068,26 @@ fn configure_file_keeps_its_input_with_its_output() {
     assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
     assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
 }
+
+#[test]
+fn bison_and_flex_targets_keep_options_with_their_values() {
+    let source = "bison_target(parser \"${CMAKE_CURRENT_SOURCE_DIR}/parser.ypp\" \"${CMAKE_CURRENT_BINARY_DIR}/parser.cpp\" DEFINES_FILE \"${CMAKE_CURRENT_BINARY_DIR}/parser.hpp\")\nflex_target(scanner lexer.l \"${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp\" OPTIONS --nounistd --never-interactive DEFINES_FILE \"${CMAKE_CURRENT_BINARY_DIR}/lexer.hpp\")\n";
+
+    let formatted = format_source(source, &Config::default()).unwrap();
+
+    insta::assert_snapshot!(formatted, @r#"
+    bison_target(
+      parser "${CMAKE_CURRENT_SOURCE_DIR}/parser.ypp"
+      "${CMAKE_CURRENT_BINARY_DIR}/parser.cpp"
+      DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/parser.hpp")
+    flex_target(
+      scanner lexer.l "${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp"
+      OPTIONS --nounistd --never-interactive
+      DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/lexer.hpp")
+    "#);
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(
+        format_source(&formatted, &Config::default()).unwrap(),
+        formatted
+    );
+}

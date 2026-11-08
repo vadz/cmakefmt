@@ -712,6 +712,33 @@ commands:
       VERSION:
         nargs: 1
 
+  # from CMake module: FindBISON
+  bison_target:
+    pargs: 3
+    kwargs:
+      DEFINES_FILE:
+        nargs: 1
+      # The file argument is deprecated, but still accepted.
+      VERBOSE:
+        nargs: "?"
+      REPORT_FILE:
+        nargs: 1
+      OPTIONS:
+        nargs: "+"
+      COMPILE_FLAGS:
+        nargs: 1
+
+  # from CMake module: FindFLEX
+  flex_target:
+    pargs: 3
+    kwargs:
+      DEFINES_FILE:
+        nargs: 1
+      OPTIONS:
+        nargs: "+"
+      COMPILE_FLAGS:
+        nargs: 1
+
   # from CMake module: FindPackageHandleStandardArgs
   find_package_handle_standard_args:
     pargs: "1+"

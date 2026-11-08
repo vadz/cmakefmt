@@ -77,6 +77,10 @@ This project follows a simple changelog discipline:
   the two halves of one statement, but `format.wrap_after_first_arg` kept
   the input on the command line and put the output below it, together with
   the options.
+- Add specs for `bison_target()` and `flex_target()` from the `FindBISON`
+  and `FindFLEX` modules. Without them, their options, such as
+  `DEFINES_FILE`, and the values following them were laid out as unrelated
+  positional arguments, and a keyword could be separated from its value.
 
 ### Fixed
 
