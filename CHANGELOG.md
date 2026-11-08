@@ -68,6 +68,11 @@ This project follows a simple changelog discipline:
   `format.wrap_after_first_arg` keeps `PARSE_ARGV <N> <prefix>` together on
   the command line rather than leaving the index and the prefix on lines of
   their own.
+- Declare `first_args: 0` for `add_compile_definitions()`,
+  `add_compile_options()`, `add_definitions()` and `add_link_options()`.
+  All of their arguments are items of the same list, and
+  `format.wrap_after_first_arg` kept the first of them on the command line
+  and the others below it, as if it were what the call acted on.
 
 ### Fixed
 

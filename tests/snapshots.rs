@@ -5016,3 +5016,30 @@ fn cmake_parse_arguments_parse_argv_keeps_its_prologue_up() {
     assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
     assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
 }
+
+#[test]
+fn add_compile_options_keeps_no_option_on_the_command_line() {
+    let source = "add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wshadow)\n";
+    let config = Config {
+        wrap_after_first_arg: true,
+        wrap_after_first_arg_align: WrapAfterFirstArgAlign::DefaultIndent,
+        max_pargs_hwrap: 0,
+        dangle_parens: true,
+        enable_markup: false,
+        ..Config::default()
+    };
+
+    let formatted = format_source(source, &config).unwrap();
+
+    insta::assert_snapshot!(formatted, @r"
+    add_compile_options(
+      -Wall
+      -Wextra
+      -Wno-unused-parameter
+      -Wno-missing-field-initializers
+      -Wshadow
+    )
+    ");
+    assert!(cmakefmt::semantic::semantic_equivalent(source, &formatted));
+    assert_eq!(format_source(&formatted, &config).unwrap(), formatted);
+}

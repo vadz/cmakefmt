@@ -1570,16 +1570,23 @@ commands:
     pargs: "1+"
   aux_source_directory:
     pargs: 2
+  # Every argument of these commands is one item of the same list and none
+  # of them says what the call acts on, so wrap_after_first_arg keeps none of
+  # them on the command line.
   add_compile_definitions:
     pargs: "+"
+    first_args: 0
   add_compile_options:
     pargs: "+"
+    first_args: 0
   add_definitions:
     pargs: "+"
+    first_args: 0
   add_dependencies:
     pargs: "2+"
   add_link_options:
     pargs: "+"
+    first_args: 0
   add_test:
     forms:
       NAME:
